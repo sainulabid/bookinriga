@@ -1,0 +1,125 @@
+{% extends "base.html" %}
+{% block title %}{{ attraction.name }} — RigaNest{% endblock %}
+
+{% block content %}
+<div class="page page-wrap">
+  <div class="container" style="padding-top:40px">
+    <div class="breadcrumb" style="font-size:13px;color:var(--gray-500);margin-bottom:8px">
+      <a href="{{ url_for('index') }}" style="color:var(--primary)">Home</a> /
+      <a href="{{ url_for('attractions') }}" style="color:var(--primary)">Attractions</a> / {{ attraction.name }}
+    </div>
+    <p class="section-label">Attractions</p>
+    <h1 style="font-size:34px;margin:0 0 28px">{{ attraction.name }}</h1>
+
+    <div class="attraction-detail-grid">
+
+      <!-- LEFT: photo + general/booking info -->
+      <div>
+        <div class="detail-slider" id="slider" style="height:280px">
+          {% if photos %}
+            {% for p in photos %}
+            <div class="detail-slide{% if loop.first %} active{% endif %}" style="background-image:url('{{ p }}')"></div>
+            {% endfor %}
+            {% if photos|length > 1 %}
+            <button class="detail-arrow prev" onclick="slide(-1)">‹</button>
+            <button class="detail-arrow next" onclick="slide(1)">›</button>
+            {% endif %}
+          {% else %}
+            <div class="detail-slide active" style="background:linear-gradient(135deg,rgb(26, 115, 232),#3a5bd4);display:flex;align-items:center;justify-content:center;font-size:70px">📍</div>
+          {% endif %}
+        </div>
+        {% if photos and photos|length > 1 %}
+        <div class="detail-thumbs" id="thumbs">
+          {% for p in photos %}
+          <div class="detail-thumb{% if loop.first %} active{% endif %}" data-i="{{ loop.index0 }}" style="background-image:url('{{ p }}')"></div>
+          {% endfor %}
+        </div>
+        {% endif %}
+
+        {% if attraction.location %}
+        <p style="margin-top:16px;font-size:13px;color:var(--gray-500)">
+          <strong style="color:var(--gray-900)">Directions =</strong>
+          <a href="https://maps.google.com/maps?q={{ attraction.location|urlencode }}" target="_blank" style="color:var(--primary);font-weight:600">See Map</a>
+        </p>
+        {% endif %}
+
+        <h4>General Information</h4>
+        <div class="attraction-info-list">
+          <p><strong>Allow Children?</strong> {{ "Yes, children are allowed" if attraction.allow_children else "No, children are not allowed" }}</p>
+          <p><strong>Allow Smoking?</strong> {{ "Yes, smoking is allowed" if attraction.allow_smoking else "No, smoking is not allowed" }}</p>
+          <p><strong>Allow pets?</strong> {{ "Yes, well behaved dogs are allowed" if attraction.allow_pets else "No, pets are not allowed" }}</p>
+          <p><strong>Is there Parking?</strong> {{ "Yes, there is customer parking" if attraction.has_parking else "No dedicated parking on site" }}</p>
+          <p><strong>Are there Handicap Facilities?</strong> {{ "Yes, there are Handicap Facilities" if attraction.has_handicap else "No handicap facilities" }}</p>
+        </div>
+
+        <h4>Booking Information</h4>
+        <div class="attraction-info-list">
+          <p><strong>Opening Time =</strong> {{ attraction.opening_time }}</p>
+          <p><strong>Closing Time =</strong> {{ attraction.closing_time }}</p>
+          <p><strong>Adult Price =</strong> {{ attraction.adult_price }}</p>
+          <p><strong>Children Price =</strong> {{ attraction.children_price }}</p>
+          <p><strong>OAP Price =</strong> {{ attraction.oap_price }}</p>
+        </div>
+      </div>
+
+      <!-- MIDDLE: summary -->
+      <div class="summary-card" style="background:#fff;border:1px solid var(--gray-100);border-radius:var(--radius-lg);padding:28px;box-shadow:var(--shadow-sm)">
+        <h4 style="margin-top:0">Summary</h4>
+        <p style="color:var(--gray-700);line-height:1.8;font-size:14px;white-space:pre-line">{{ attraction.summary }}</p>
+      </div>
+
+      <!-- RIGHT: location map + book now -->
+      <div class="summary-card" style="background:#fff;border:1px solid var(--gray-100);border-radius:var(--radius-lg);padding:28px;box-shadow:var(--shadow-sm)">
+        <h4 style="margin-top:0">Location</h4>
+        {% if attraction.location %}
+        <iframe class="map-frame" style="height:220px" loading="lazy"
+          src="https://maps.google.com/maps?q={{ attraction.location|urlencode }}&output=embed"></iframe>
+        {% endif %}
+        <a href="{{ attraction.booking_url if attraction.booking_url else ('https://wa.me/' ~ whatsapp_digits ~ '?text=' ~ (('Hi! I would like to know more about ' ~ attraction.name ~ '.')|urlencode)) }}"
+           target="_blank" rel="noopener" class="btn-primary btn-full" style="margin-top:18px">
+          {{ 'Book Now' if attraction.booking_url else 'Ask About This' }}
+        </a>
+      </div>
+
+    </div>
+
+    <!-- MORE ATTRACTIONS -->
+    {% if related_attractions %}
+    <h3 style="margin:50px 0 20px;font-size:24px">More Attractions</h3>
+    <div class="rooms-grid">
+      {% for r in related_attractions %}
+      <a class="room-card" href="{{ url_for('attraction_detail', attraction_id=r.id) }}">
+        <div class="room-img">
+          {% if r.image_url() %}<img src="{{ r.image_url() }}" alt="{{ r.name }}">
+          {% else %}<span class="room-img-placeholder">📍</span>{% endif %}
+        </div>
+        <div class="room-body">
+          <div class="room-name">{{ r.name }}</div>
+        </div>
+      </a>
+      {% endfor %}
+    </div>
+    {% endif %}
+
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+  var slides=document.querySelectorAll('#slider .detail-slide');
+  var thumbs=document.querySelectorAll('#thumbs .detail-thumb');
+  var cur=0;
+  function show(i){
+    if(!slides.length) return;
+    slides.forEach(function(s){ s.classList.remove('active'); });
+    thumbs.forEach(function(t){ t.classList.remove('active'); });
+    cur=(i+slides.length)%slides.length;
+    slides[cur].classList.add('active');
+    if(thumbs[cur]) thumbs[cur].classList.add('active');
+  }
+  function slide(d){ show(cur+d); }
+  thumbs.forEach(function(t){ t.addEventListener('click',function(){ show(parseInt(t.dataset.i)); }); });
+  if(slides.length>1) setInterval(function(){ show(cur+1); },4500);
+</script>
+{% endblock %}

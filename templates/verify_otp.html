@@ -1,0 +1,60 @@
+{% extends "base.html" %}
+{% block title %}Verify — RigaNest{% endblock %}
+
+{% block content %}
+<div class="page page-wrap">
+  <div class="container" style="padding-top:70px;max-width:460px">
+    <div style="background:#fff;border:1px solid var(--gray-100);border-radius:var(--radius-lg);padding:40px;box-shadow:var(--shadow-md);text-align:center">
+      <div style="font-size:46px;margin-bottom:8px">📧</div>
+      <h1 style="font-size:26px;margin-bottom:8px">Enter verification code</h1>
+      <p style="color:var(--gray-500);margin-bottom:20px">We sent a 6-digit code to your Gmail at {{ email }}.</p>
+
+      {% if dev_otp %}
+      <div class="otp-note">
+        <strong>Dev mode:</strong> Gmail isn't configured, so your code is
+        <strong style="font-size:16px;letter-spacing:2px">{{ dev_otp }}</strong><br>
+        (also printed in the terminal)
+      </div>
+      {% endif %}
+
+      <form method="post" id="otpForm">
+        <input type="hidden" name="otp" id="otpHidden">
+        <div class="otp-wrap">
+          {% for i in range(6) %}<input class="otp-input" inputmode="numeric" maxlength="1" data-i="{{ i }}">{% endfor %}
+        </div>
+        <button class="btn-primary btn-full" type="submit">Verify & Sign In</button>
+      </form>
+
+      <p style="margin-top:18px;font-size:14px;color:var(--gray-500)">
+        Didn't get it? <a href="{{ url_for('resend_otp') }}" style="color:var(--primary);font-weight:600">Resend code</a>
+      </p>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+  const boxes = [...document.querySelectorAll('.otp-input')];
+  const hidden = document.getElementById('otpHidden');
+  function sync() { hidden.value = boxes.map(b => b.value).join(''); }
+  boxes.forEach((b, i) => {
+    b.addEventListener('input', () => {
+      b.value = b.value.replace(/\D/g,'').slice(0,1);
+      if (b.value && i < 5) boxes[i+1].focus();
+      sync();
+    });
+    b.addEventListener('keydown', e => {
+      if (e.key === 'Backspace' && !b.value && i > 0) boxes[i-1].focus();
+    });
+    b.addEventListener('paste', e => {
+      const d = (e.clipboardData.getData('text') || '').replace(/\D/g,'').slice(0,6);
+      d.split('').forEach((c,j) => { if (boxes[j]) boxes[j].value = c; });
+      sync(); e.preventDefault();
+      if (boxes[Math.min(d.length,5)]) boxes[Math.min(d.length,5)].focus();
+    });
+  });
+  if (boxes[0]) boxes[0].focus();
+  document.getElementById('otpForm').addEventListener('submit', sync);
+</script>
+{% endblock %}

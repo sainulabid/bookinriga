@@ -1,0 +1,256 @@
+{% extends "base.html" %}
+{% block title %}Settings — Admin{% endblock %}
+
+{% block content %}
+<div class="page page-wrap">
+  <div class="container admin-shell">
+    <h1 style="font-size:32px">Settings</h1>
+
+    <div class="admin-tabs">
+      <a href="{{ url_for('admin_dashboard') }}">Overview</a>
+      <a href="{{ url_for('admin_rooms') }}">Rooms</a>
+      <a href="{{ url_for('admin_attractions') }}">Attractions</a>
+      <a href="{{ url_for('admin_bookings') }}">Bookings</a>
+      <a href="{{ url_for('admin_users') }}">Users</a>
+      <a href="{{ url_for('admin_messages') }}">Messages</a>
+      <a href="{{ url_for('admin_settings') }}" class="active">Settings</a>
+    </div>
+
+    <!-- LOGO SECTION -->
+    <div style="max-width:600px;margin-top:32px">
+      <h2 style="font-size:22px;margin-bottom:6px">Site Logo</h2>
+      <p style="color:#6b7280;font-size:14px;margin-bottom:24px">
+        Upload your hotel logo. It will appear in the navigation bar and footer.
+        Recommended size: 200×60 px. Formats: PNG, JPG, SVG, WEBP.
+      </p>
+
+      <!-- Current logo preview -->
+      <div style="background:#f5f6f8;border:1px solid #e5e7eb;border-radius:12px;padding:28px;margin-bottom:24px;text-align:center">
+        {% if logo_exists and current_logo %}
+          <p style="font-size:12px;color:#6b7280;margin-bottom:12px;text-transform:uppercase;letter-spacing:.06em;font-weight:600">Current Logo</p>
+          <div style="background:white;display:inline-block;padding:16px 32px;border-radius:8px;border:1px solid #e5e7eb;margin-bottom:20px">
+            <img src="{{ url_for('static', filename=current_logo) }}"
+                 alt="Current logo"
+                 style="max-height:64px;max-width:260px;object-fit:contain;display:block">
+          </div>
+          <br>
+          <form method="POST" style="display:inline">
+            <input type="hidden" name="action" value="remove">
+            <button type="submit"
+                    onclick="return confirm('Remove logo and show site name text instead?')"
+                    style="background:#fee2e2;color:#991b1b;border:1px solid #fca5a5;border-radius:8px;padding:8px 18px;font-size:13px;font-weight:600;cursor:pointer">
+              🗑 Remove Logo
+            </button>
+          </form>
+        {% else %}
+          <div style="padding:24px 0">
+            <div style="font-size:48px;margin-bottom:8px">🖼️</div>
+            <p style="color:#6b7280;font-size:14px">No logo uploaded yet.<br>The site name text is shown instead.</p>
+          </div>
+        {% endif %}
+      </div>
+
+      <!-- Upload form -->
+      <div style="background:white;border:2px dashed #e5e7eb;border-radius:12px;padding:32px;text-align:center"
+           id="drop-zone">
+        <form method="POST" enctype="multipart/form-data" id="logo-form">
+          <input type="hidden" name="action" value="upload">
+          <input type="file" name="logo" id="logo-input" accept=".png,.jpg,.jpeg,.svg,.webp"
+                 style="display:none" onchange="previewLogo(this)">
+
+          <div id="preview-area" style="display:none;margin-bottom:20px">
+            <p style="font-size:12px;color:#6b7280;margin-bottom:8px;font-weight:600">Preview</p>
+            <div style="background:#f5f6f8;display:inline-block;padding:12px 28px;border-radius:8px">
+              <img id="preview-img" src="" alt="preview"
+                   style="max-height:64px;max-width:240px;object-fit:contain;display:block">
+            </div>
+            <p id="preview-name" style="font-size:12px;color:#6b7280;margin-top:8px"></p>
+          </div>
+
+          <div id="upload-prompt">
+            <div style="font-size:40px;margin-bottom:12px">☁️</div>
+            <p style="font-weight:600;margin-bottom:4px">Click to choose a logo</p>
+            <p style="color:#6b7280;font-size:13px">PNG, JPG, SVG or WEBP · Max 2 MB</p>
+          </div>
+
+          <button type="button" onclick="document.getElementById('logo-input').click()"
+                  style="margin-top:16px;background:#f5f6f8;border:1.5px solid #e5e7eb;border-radius:8px;padding:10px 24px;font-size:14px;font-weight:600;cursor:pointer">
+            Browse File
+          </button>
+
+          <div id="submit-row" style="display:none;margin-top:16px">
+            <button type="submit"
+                    style="background:#1ca882;color:white;border:none;border-radius:8px;padding:11px 28px;font-size:15px;font-weight:700;cursor:pointer">
+              ✅ Upload Logo
+            </button>
+            <button type="button" onclick="resetPreview()"
+                    style="margin-left:10px;background:transparent;border:1px solid #e5e7eb;border-radius:8px;padding:10px 18px;font-size:13px;cursor:pointer;color:#6b7280">
+              Cancel
+            </button>
+          </div>
+        </form>
+      </div>
+
+      <!-- Tips -->
+      <div style="margin-top:20px;background:#eff6ff;border:1px solid #bfdbfe;border-radius:8px;padding:16px 20px">
+        <p style="font-size:13px;font-weight:700;color:#1e40af;margin-bottom:6px">💡 Tips for best results</p>
+        <ul style="font-size:13px;color:#1e40af;padding-left:18px;line-height:1.8;margin:0">
+          <li>Use a <strong>transparent background</strong> (PNG or SVG) for a clean look on light and dark backgrounds.</li>
+          <li>Recommended dimensions: <strong>200–300 px wide, 50–70 px tall</strong>.</li>
+          <li>SVG logos scale perfectly on all screen sizes.</li>
+          <li>Keep file size under <strong>200 KB</strong> for fast loading.</li>
+        </ul>
+      </div>
+    </div>
+
+    <!-- BANNER IMAGES SECTION -->
+    <div style="max-width:600px;margin-top:48px">
+      <h2 style="font-size:22px;margin-bottom:6px">Homepage Banner Images</h2>
+      <p style="color:#6b7280;font-size:14px;margin-bottom:24px">
+        These images rotate in the homepage hero slider. Upload one or more, or remove any you no longer want.
+        Recommended size: 1920×1080 px (landscape). Formats: PNG, JPG, GIF, WEBP.
+      </p>
+
+      <!-- Current banner images -->
+      <div style="background:#f5f6f8;border:1px solid #e5e7eb;border-radius:12px;padding:24px;margin-bottom:24px">
+        {% if banner_images %}
+          <p style="font-size:12px;color:#6b7280;margin-bottom:14px;text-transform:uppercase;letter-spacing:.06em;font-weight:600">Current Banner Images ({{ banner_images|length }})</p>
+          <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:14px">
+            {% for fn in banner_images %}
+            <div style="background:white;border:1px solid #e5e7eb;border-radius:8px;overflow:hidden">
+              <img src="{{ url_for('static', filename='slides/' + fn) }}" alt="Banner image"
+                   style="width:100%;height:90px;object-fit:cover;display:block">
+              <form method="POST" style="padding:8px">
+                <input type="hidden" name="action" value="remove_banner">
+                <input type="hidden" name="filename" value="{{ fn }}">
+                <button type="submit"
+                        onclick="return confirm('Remove this banner image?')"
+                        style="width:100%;background:#fee2e2;color:#991b1b;border:1px solid #fca5a5;border-radius:6px;padding:6px 10px;font-size:12px;font-weight:600;cursor:pointer">
+                  🗑 Remove
+                </button>
+              </form>
+            </div>
+            {% endfor %}
+          </div>
+        {% else %}
+          <div style="padding:24px 0;text-align:center">
+            <div style="font-size:48px;margin-bottom:8px">🖼️</div>
+            <p style="color:#6b7280;font-size:14px">No banner images uploaded yet.<br>The hero section will show a default background.</p>
+          </div>
+        {% endif %}
+      </div>
+
+      <!-- Upload form -->
+      <div style="background:white;border:2px dashed #e5e7eb;border-radius:12px;padding:32px;text-align:center"
+           id="banner-drop-zone">
+        <form method="POST" enctype="multipart/form-data" id="banner-form">
+          <input type="hidden" name="action" value="upload_banner">
+          <input type="file" name="banner_images" id="banner-input" accept=".png,.jpg,.jpeg,.gif,.webp" multiple
+                 style="display:none" onchange="previewBanners(this)">
+
+          <div id="banner-preview-area" style="display:none;margin-bottom:20px">
+            <p style="font-size:12px;color:#6b7280;margin-bottom:8px;font-weight:600">Selected files</p>
+            <p id="banner-preview-names" style="font-size:13px;color:#374151"></p>
+          </div>
+
+          <div id="banner-upload-prompt">
+            <div style="font-size:40px;margin-bottom:12px">☁️</div>
+            <p style="font-weight:600;margin-bottom:4px">Click to choose banner image(s)</p>
+            <p style="color:#6b7280;font-size:13px">PNG, JPG, GIF or WEBP · You can select multiple files</p>
+          </div>
+
+          <button type="button" onclick="document.getElementById('banner-input').click()"
+                  style="margin-top:16px;background:#f5f6f8;border:1.5px solid #e5e7eb;border-radius:8px;padding:10px 24px;font-size:14px;font-weight:600;cursor:pointer">
+            Browse Files
+          </button>
+
+          <div id="banner-submit-row" style="display:none;margin-top:16px">
+            <button type="submit"
+                    style="background:#1ca882;color:white;border:none;border-radius:8px;padding:11px 28px;font-size:15px;font-weight:700;cursor:pointer">
+              ✅ Upload Banner Image(s)
+            </button>
+            <button type="button" onclick="resetBannerPreview()"
+                    style="margin-left:10px;background:transparent;border:1px solid #e5e7eb;border-radius:8px;padding:10px 18px;font-size:13px;cursor:pointer;color:#6b7280">
+              Cancel
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<script>
+function previewLogo(input) {
+  if (!input.files || !input.files[0]) return;
+  const file = input.files[0];
+  if (file.size > 2 * 1024 * 1024) {
+    alert('File is too large. Please choose a file under 2 MB.');
+    input.value = '';
+    return;
+  }
+  const reader = new FileReader();
+  reader.onload = function(e) {
+    document.getElementById('preview-img').src = e.target.result;
+    document.getElementById('preview-name').textContent = file.name + ' (' + (file.size / 1024).toFixed(1) + ' KB)';
+    document.getElementById('preview-area').style.display = 'block';
+    document.getElementById('upload-prompt').style.display = 'none';
+    document.getElementById('submit-row').style.display = 'block';
+    document.getElementById('drop-zone').style.borderColor = '#1ca882';
+    document.getElementById('drop-zone').style.background = '#f0fdf9';
+  };
+  reader.readAsDataURL(file);
+}
+
+function resetPreview() {
+  document.getElementById('logo-input').value = '';
+  document.getElementById('preview-area').style.display = 'none';
+  document.getElementById('upload-prompt').style.display = 'block';
+  document.getElementById('submit-row').style.display = 'none';
+  document.getElementById('drop-zone').style.borderColor = '#e5e7eb';
+  document.getElementById('drop-zone').style.background = 'white';
+}
+
+// Drag & drop
+const dz = document.getElementById('drop-zone');
+dz.addEventListener('dragover', e => { e.preventDefault(); dz.style.borderColor = '#1ca882'; dz.style.background = '#f0fdf9'; });
+dz.addEventListener('dragleave', () => { dz.style.borderColor = '#e5e7eb'; dz.style.background = 'white'; });
+dz.addEventListener('drop', e => {
+  e.preventDefault();
+  const fi = document.getElementById('logo-input');
+  fi.files = e.dataTransfer.files;
+  previewLogo(fi);
+});
+
+function previewBanners(input) {
+  if (!input.files || !input.files.length) return;
+  const names = Array.from(input.files).map(f => f.name).join(', ');
+  document.getElementById('banner-preview-names').textContent = names;
+  document.getElementById('banner-preview-area').style.display = 'block';
+  document.getElementById('banner-upload-prompt').style.display = 'none';
+  document.getElementById('banner-submit-row').style.display = 'block';
+  document.getElementById('banner-drop-zone').style.borderColor = '#1ca882';
+  document.getElementById('banner-drop-zone').style.background = '#f0fdf9';
+}
+
+function resetBannerPreview() {
+  document.getElementById('banner-input').value = '';
+  document.getElementById('banner-preview-area').style.display = 'none';
+  document.getElementById('banner-upload-prompt').style.display = 'block';
+  document.getElementById('banner-submit-row').style.display = 'none';
+  document.getElementById('banner-drop-zone').style.borderColor = '#e5e7eb';
+  document.getElementById('banner-drop-zone').style.background = 'white';
+}
+
+const bdz = document.getElementById('banner-drop-zone');
+bdz.addEventListener('dragover', e => { e.preventDefault(); bdz.style.borderColor = '#1ca882'; bdz.style.background = '#f0fdf9'; });
+bdz.addEventListener('dragleave', () => { bdz.style.borderColor = '#e5e7eb'; bdz.style.background = 'white'; });
+bdz.addEventListener('drop', e => {
+  e.preventDefault();
+  const fi = document.getElementById('banner-input');
+  fi.files = e.dataTransfer.files;
+  previewBanners(fi);
+});
+</script>
+{% endblock %}

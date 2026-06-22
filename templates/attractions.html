@@ -1,0 +1,40 @@
+{% extends "base.html" %}
+{% block title %}Attractions — RigaNest{% endblock %}
+
+{% block content %}
+<div class="page page-wrap">
+  <div class="page-hero-sm" style="background:linear-gradient(135deg,rgb(0, 74, 170),rgb(26, 115, 232));padding:60px 0;color:#fff">
+    <div class="container">
+      <div class="breadcrumb" style="color:rgba(255,255,255,0.6);font-size:13px;margin-bottom:10px">
+        <a href="{{ url_for('index') }}" style="color:var(--gold)">Home</a> / Attractions
+      </div>
+      <h1 style="color:#fff;font-size:38px">Attractions</h1>
+      <p style="color:rgba(255,255,255,0.7)">Take a look inside RigaNest — places worth visiting nearby.</p>
+    </div>
+  </div>
+
+  <section style="padding:48px 0">
+    <div class="container">
+      {% if attractions %}
+      <div class="rooms-grid">
+        {% for a in attractions %}
+        <a class="room-card" href="{{ url_for('attraction_detail', attraction_id=a.id) }}">
+          <div class="room-img">
+            {% if a.image_url() %}<img src="{{ a.image_url() }}" alt="{{ a.name }}">
+            {% else %}<span class="room-img-placeholder">📍</span>{% endif %}
+          </div>
+          <div class="room-body">
+            <div class="room-name">{{ a.name }}</div>
+            {% if a.location %}<div class="room-meta" style="margin-bottom:10px"><span>📍 {{ a.location }}</span></div>{% endif %}
+            {% if a.summary %}<p style="color:var(--gray-500);font-size:13px;line-height:1.6;margin:0">{{ a.summary[:110] }}{% if a.summary|length > 110 %}…{% endif %}</p>{% endif %}
+          </div>
+        </a>
+        {% endfor %}
+      </div>
+      {% else %}
+      <div class="empty-state"><h3>No attractions yet</h3><p>Check back soon.</p></div>
+      {% endif %}
+    </div>
+  </section>
+</div>
+{% endblock %}

@@ -1,0 +1,161 @@
+{% extends "base.html" %}
+{% block title %}RigaNest — Comfortable Stays in Riga{% endblock %}
+
+{% block content %}
+<div class="page page-wrap">
+
+  <section class="hero">
+    <!-- Image slider -->
+    <div class="hero-slider" id="heroSlider">
+      {% if slides %}
+        {% for s in slides %}
+        <div class="hero-slide{% if loop.first %} active{% endif %}" style="background-image:url('{{ s }}')"></div>
+        {% endfor %}
+      {% else %}
+        <div class="hero-slide active"></div>
+      {% endif %}
+    </div>
+
+    <div class="search-box-wrap">
+      <h1>{% if lang=='lv' %}Rezervējiet savu uzturēšanos{% else %}Book Your Stay{% endif %}</h1>
+      <p class="hero-sub">{% if lang=='lv' %}Mājīgi apartamenti Rīgas sirdī{% else %}Comfortable apartments in the heart of Riga{% endif %}</p>
+
+      <form class="search-box-dates" method="get" action="{{ url_for('rooms') }}">
+        <div class="search-field">
+          <label>
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/></svg>
+            {% if lang=='lv' %}Reģistrēšanās datums{% else %}Check-in Date{% endif %}
+          </label>
+          <input type="date" name="check_in" value="{{ today }}" min="{{ today }}" required>
+        </div>
+        <div class="search-field">
+          <label>
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/></svg>
+            {% if lang=='lv' %}Izrakstīšanās datums{% else %}Check-out Date{% endif %}
+          </label>
+          <input type="date" name="check_out" value="{{ tomorrow }}" min="{{ tomorrow }}" required>
+        </div>
+        <div class="search-field">
+          <label>
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+            {% if lang=='lv' %}Viesi{% else %}Guests{% endif %}
+          </label>
+          <select name="guests">
+            {% for n in range(1, 9) %}<option value="{{ n }}">{{ n }} {% if lang=='lv' %}viesis{% else %}Guest{{ 's' if n > 1 }}{% endif %}</option>{% endfor %}
+          </select>
+        </div>
+        <button class="search-btn-dark" type="submit">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
+          {% if lang=='lv' %}Rezervēt tagad{% else %}Book Now{% endif %}
+        </button>
+      </form>
+    </div>
+
+    {% if slides and slides|length > 1 %}
+    <div class="hero-dots" id="heroDots">
+      {% for s in slides %}<button class="hero-dot{% if loop.first %} active{% endif %}" data-i="{{ loop.index0 }}"></button>{% endfor %}
+    </div>
+    {% endif %}
+  </section>
+
+  <!-- Featured Rooms -->
+  <section>
+    <div class="container">
+      <div class="section-head">
+        <p class="section-label">{% if lang=='lv' %}Speciāli izvēlēts jums{% else %}Handpicked For You{% endif %}</p>
+        <h2 class="section-title">{% if lang=='lv' %}Piedāvātās istabas un apartamenti{% else %}Featured Rooms & Suites{% endif %}</h2>
+        <p class="section-sub">{% if lang=='lv' %}Mūsu mīļākās telpas, izvēlētas pēc komforta, stila un neaizmirstama skata.{% else %}Our most loved spaces, chosen for comfort, style and that unforgettable view.{% endif %}</p>
+      </div>
+
+      <div class="rooms-grid">
+        {% for room in rooms %}
+        <a class="room-card" href="{{ url_for('room_detail', room_id=room.id) }}">
+          <div class="room-img">
+            {% set cover = room.image_url() or (room.photo_urls()[0] if room.photo_urls() else None) %}
+            {% if cover %}<img src="{{ cover }}" alt="{{ room.name }}">
+            {% else %}<span class="room-img-placeholder">🛏️</span>{% endif %}
+            <div class="room-img-badge"><span class="badge badge-gold">{{ room.room_type }}</span></div>
+          </div>
+          <div class="room-body">
+            <div class="room-name">{{ room.name }}</div>
+            <div class="room-meta">
+              <span>👤 {{ room.capacity }} guests</span>
+              <span>🛏️ {{ room.beds }} bed{{ 's' if room.beds > 1 }}</span>
+              <span>📐 {{ room.size_sqm }}m²</span>
+            </div>
+            <div class="room-amenities">
+              {% for a in room.amenity_list()[:3] %}<span class="amenity-tag">{{ a }}</span>{% endfor %}
+            </div>
+            <div class="room-footer">
+              <div class="room-price">€{{ '%.0f'|format(room.price) }}<span>/night</span></div>
+              <div class="room-stars">★ {{ '%.1f'|format(room.rating) }}</div>
+            </div>
+          </div>
+        </a>
+        {% endfor %}
+      </div>
+
+      <div style="text-align:center;margin-top:44px">
+        <a href="{{ url_for('rooms') }}" class="btn-secondary">{% if lang=='lv' %}Skatīt visas istabas →{% else %}View All Rooms →{% endif %}</a>
+      </div>
+    </div>
+  </section>
+
+  <!-- Photo gallery: attractions, with names + links to detail pages -->
+  <section style="padding-top:0">
+    <div class="container">
+      <div class="section-head">
+        <p class="section-label">{% if lang=='lv' %}Ieskatieties{% else %}Take A Look{% endif %}</p>
+        <h2 class="section-title">{% if lang=='lv' %}RigaNest iekšpusē{% else %}Inside RigaNest{% endif %}</h2>
+      </div>
+      {% if gallery %}
+      <div class="home-gallery">
+        {% for g in gallery %}
+        <a class="gallery-cell" href="{{ url_for('attraction_detail', attraction_id=g.id) }}"
+           {% if g.image_url() %}style="background-image:url('{{ g.image_url() }}')"{% else %}style="background:linear-gradient(135deg,var(--primary),var(--primary-mid))"{% endif %}>
+          <span class="gallery-cell-name">{{ g.name }}</span>
+        </a>
+        {% endfor %}
+      </div>
+      <div style="text-align:center;margin-top:36px">
+        <a href="{{ url_for('attractions') }}" class="btn-secondary">{% if lang=='lv' %}Skatīt visas apskates vietas →{% else %}View All Attractions →{% endif %}</a>
+      </div>
+      {% else %}
+      <div class="empty-state"><h3>No attractions added yet</h3></div>
+      {% endif %}
+    </div>
+  </section>
+
+  <!-- CTA -->
+  <section style="background:var(--off-white)">
+    <div class="container" style="text-align:center">
+      <p class="section-label">{% if lang=='lv' %}Biedru priekšrocības{% else %}Member Benefits{% endif %}</p>
+      <h2 class="section-title">{% if lang=='lv' %}Pievienojieties RigaNest, ietaupiet katrā uzturēšanās reizē{% else %}Join RigaNest, save on every stay{% endif %}</h2>
+      <p class="section-sub" style="margin:0 auto 28px">{% if lang=='lv' %}Izveidojiet bezmaksas kontu biedru cenām, ātrākai norēķināšanās un drošai e-pasta verificētai pieteikšanās.{% else %}Create a free account for member rates, faster checkout and secure email-verified login.{% endif %}</p>
+      {% if not current_user.is_authenticated %}
+      <a href="{{ url_for('register') }}" class="btn-primary">{% if lang=='lv' %}Izveidot bezmaksas kontu{% else %}Create Free Account{% endif %}</a>
+      {% else %}
+      <a href="{{ url_for('rooms') }}" class="btn-primary">{% if lang=='lv' %}Pārlūkot istabas{% else %}Browse Rooms{% endif %}</a>
+      {% endif %}
+    </div>
+  </section>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+  // Hero image slider
+  const slides = document.querySelectorAll('.hero-slide');
+  const dots = document.querySelectorAll('.hero-dot');
+  let cur = 0;
+  function go(i) {
+    slides.forEach(s => s.classList.remove('active'));
+    dots.forEach(d => d.classList.remove('active'));
+    cur = (i + slides.length) % slides.length;
+    if (slides[cur]) slides[cur].classList.add('active');
+    if (dots[cur]) dots[cur].classList.add('active');
+  }
+  dots.forEach(d => d.addEventListener('click', () => go(parseInt(d.dataset.i))));
+  if (slides.length > 1) setInterval(() => go(cur + 1), 5000);
+</script>
+{% endblock %}

@@ -1,0 +1,49 @@
+{% extends "base.html" %}
+{% block title %}My Bookings — RigaNest{% endblock %}
+
+{% block content %}
+<div class="page page-wrap">
+  <div class="container" style="padding:50px 24px">
+    <h1 style="font-size:34px;margin-bottom:6px">My Bookings</h1>
+    <p style="color:var(--gray-500);margin-bottom:32px">Welcome back, {{ current_user.name }}.</p>
+
+    {% if bookings %}
+    <table class="admin-table">
+      <thead>
+        <tr><th>Room</th><th>Check-in</th><th>Check-out</th><th>Nights</th><th>Total</th><th>Payment</th><th>Status</th><th></th></tr>
+      </thead>
+      <tbody>
+        {% for b in bookings %}
+        <tr>
+          <td><a href="{{ url_for('room_detail', room_id=b.room.id) }}" style="color:var(--primary);font-weight:600">{{ b.room.name }}</a></td>
+          <td>{{ b.check_in.strftime('%d %b %Y') }}</td>
+          <td>{{ b.check_out.strftime('%d %b %Y') }}</td>
+          <td>{{ b.nights() }}</td>
+          <td>€{{ '%.0f'|format(b.total_price) }}</td>
+          <td><span class="badge {{ 'badge-green' if b.payment_status=='Paid' else 'badge-gold' }}">{{ b.payment_status }}</span></td>
+          <td>
+            {% if b.status=='Confirmed' %}<span class="badge badge-green">Confirmed</span>
+            {% elif b.status=='Pending' %}<span class="badge badge-gold">Pending</span>
+            {% else %}<span class="badge badge-red">Cancelled</span>{% endif %}
+          </td>
+          <td>
+            {% if b.status=='Confirmed' and b.check_in >= today %}
+            <form method="post" action="{{ url_for('cancel_confirmed', booking_id=b.id) }}" onsubmit="return confirm('Cancel this booking?');">
+              <button class="btn-sm" style="background:var(--danger-soft);color:var(--danger);border:none;padding:6px 14px;border-radius:var(--radius);font-weight:600;cursor:pointer">Cancel</button>
+            </form>
+            {% endif %}
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    {% else %}
+    <div class="empty-state">
+      <h3>No bookings yet</h3>
+      <p>When you reserve a room it will appear here.</p>
+      <a href="{{ url_for('rooms') }}" class="btn-primary" style="margin-top:18px">Browse Rooms</a>
+    </div>
+    {% endif %}
+  </div>
+</div>
+{% endblock %}

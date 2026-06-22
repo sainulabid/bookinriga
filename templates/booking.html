@@ -1,0 +1,81 @@
+{% extends "base.html" %}
+{% block title %}Book {{ room.name }} — RigaNest{% endblock %}
+{% block head %}
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css">
+{% endblock %}
+
+{% block content %}
+<div class="page page-wrap">
+  <div class="container" style="padding-top:40px;max-width:900px">
+    <div class="breadcrumb" style="font-size:13px;color:var(--gray-500);margin-bottom:20px">
+      <a href="{{ url_for('room_detail', room_id=room.id) }}" style="color:var(--primary)">← Back to {{ room.name }}</a>
+    </div>
+    <h1 style="font-size:32px;margin-bottom:6px">Reserve your stay</h1>
+    <p style="color:var(--gray-500);margin-bottom:28px">{{ room.name }} · €{{ '%.0f'|format(room.price) }}/night</p>
+
+    <form method="post" class="booking-form-grid" style="align-items:start">
+      <div class="form-section-card" style="background:#fff;border:1px solid var(--gray-100);border-radius:var(--radius-lg);padding:28px">
+        <div class="form-row">
+          <div class="form-group">
+            <label>Check-in</label>
+            <input type="text" id="check_in" name="check_in" placeholder="Select date" required readonly>
+          </div>
+          <div class="form-group">
+            <label>Check-out</label>
+            <input type="text" id="check_out" name="check_out" placeholder="Select date" required readonly>
+          </div>
+        </div>
+        <div class="form-group">
+          <label>Guests</label>
+          <select name="guests">
+            {% for n in range(1, room.capacity + 1) %}<option value="{{ n }}">{{ n }} guest{{ 's' if n > 1 }}</option>{% endfor %}
+          </select>
+        </div>
+        <button type="submit" class="btn-primary btn-full" style="padding:15px;font-size:16px">Continue to payment →</button>
+        <p style="text-align:center;font-size:12px;color:var(--gray-500);margin-top:12px">
+          {% if payments_live %}🔒 You'll pay securely with Stripe.{% else %}Demo mode — no real charge.{% endif %}
+        </p>
+      </div>
+
+      <div class="summary-card" style="background:var(--off-white);border:1px solid var(--gray-100);border-radius:var(--radius-lg);padding:24px">
+        <h3 style="font-size:18px;margin-bottom:16px">Price summary</h3>
+        <div style="display:flex;justify-content:space-between;font-size:14px;color:var(--gray-700);margin-bottom:10px">
+          <span>Per night</span><span>€{{ '%.0f'|format(room.price) }}</span>
+        </div>
+        <div id="summaryLine" style="color:var(--gray-500);font-size:14px">Select dates to see total</div>
+        <hr style="border:none;border-top:1px solid var(--gray-100);margin:16px 0">
+        <div style="display:flex;justify-content:space-between;font-weight:700;font-size:18px">
+          <span>Total</span><span id="summaryTotal" class="room-price" style="font-size:22px">—</span>
+        </div>
+      </div>
+    </form>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
+<script>
+  const price = {{ room.price }};
+  const booked = {{ booked_ranges|default([])|tojson }};
+  const line = document.getElementById('summaryLine');
+  const total = document.getElementById('summaryTotal');
+
+  function update(a, b) {
+    if (!a || !b) return;
+    const n = Math.round((b - a) / 86400000);
+    if (n > 0) {
+      line.textContent = '€' + price.toFixed(0) + ' × ' + n + ' night' + (n>1?'s':'');
+      total.textContent = '€' + (n * price).toFixed(0);
+    }
+  }
+  const ci = flatpickr("#check_in", {
+    minDate: "today", dateFormat: "Y-m-d",
+    onChange: d => { if (d[0]) { co.set("minDate", new Date(d[0]).fp_incr(1)); update(d[0], co.selectedDates[0]); } }
+  });
+  const co = flatpickr("#check_out", {
+    minDate: new Date().fp_incr(1), dateFormat: "Y-m-d",
+    onChange: d => update(ci.selectedDates[0], d[0])
+  });
+</script>
+{% endblock %}

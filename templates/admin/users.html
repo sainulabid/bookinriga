@@ -1,0 +1,35 @@
+{% extends "base.html" %}
+{% block title %}Admin Users — RigaNest{% endblock %}
+
+{% block content %}
+<div class="page page-wrap">
+  <div class="container admin-shell">
+    <h1 style="font-size:32px">Users</h1>
+    <div class="admin-tabs">
+      <a href="{{ url_for('admin_dashboard') }}">Overview</a>
+      <a href="{{ url_for('admin_rooms') }}">Rooms</a>
+      <a href="{{ url_for('admin_attractions') }}">Attractions</a>
+      <a href="{{ url_for('admin_bookings') }}">Bookings</a>
+      <a href="{{ url_for('admin_users') }}" class="active">Users</a>
+      <a href="{{ url_for('admin_messages') }}">Messages</a>
+      <a href="{{ url_for('admin_settings') }}">Settings</a>
+    </div>
+
+    <table class="admin-table">
+      <thead><tr><th>#</th><th>Name</th><th>Email</th><th>Phone</th><th>Role</th><th>Joined</th></tr></thead>
+      <tbody>
+        {% for u in users %}
+        <tr>
+          <td>{{ u.id }}</td>
+          <td style="font-weight:600">{{ u.name }}</td>
+          <td>{{ u.email }}</td>
+          <td>{{ u.phone }}</td>
+          <td>{% if u.is_admin %}<span class="badge badge-blue">Admin</span>{% else %}<span class="badge">Guest</span>{% endif %}</td>
+          <td>{{ u.created_at.strftime('%d %b %Y') }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endblock %}

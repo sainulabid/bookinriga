@@ -1,0 +1,37 @@
+{% extends "base.html" %}
+{% block title %}Admin Messages — RigaNest{% endblock %}
+
+{% block content %}
+<div class="page page-wrap">
+  <div class="container admin-shell">
+    <h1 style="font-size:32px">Messages</h1>
+    <div class="admin-tabs">
+      <a href="{{ url_for('admin_dashboard') }}">Overview</a>
+      <a href="{{ url_for('admin_rooms') }}">Rooms</a>
+      <a href="{{ url_for('admin_attractions') }}">Attractions</a>
+      <a href="{{ url_for('admin_bookings') }}">Bookings</a>
+      <a href="{{ url_for('admin_users') }}">Users</a>
+      <a href="{{ url_for('admin_messages') }}" class="active">Messages</a>
+    </div>
+
+    {% if messages %}
+    <table class="admin-table">
+      <thead><tr><th>Date</th><th>Name</th><th>Email</th><th>Subject</th><th>Message</th></tr></thead>
+      <tbody>
+        {% for m in messages %}
+        <tr>
+          <td>{{ m.created_at.strftime('%d %b %Y') }}</td>
+          <td style="font-weight:600">{{ m.name }}</td>
+          <td>{{ m.email }}</td>
+          <td>{{ m.subject }}</td>
+          <td style="max-width:380px">{{ m.message }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    {% else %}
+    <div class="empty-state"><h3>No messages yet</h3><p>Contact form submissions will appear here.</p></div>
+    {% endif %}
+  </div>
+</div>
+{% endblock %}

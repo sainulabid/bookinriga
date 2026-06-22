@@ -1,0 +1,85 @@
+{% extends "base.html" %}
+{% block title %}Rooms — RigaNest{% endblock %}
+
+{% block content %}
+<div class="page page-wrap">
+  <div class="page-hero-sm" style="background:linear-gradient(135deg,rgb(0, 74, 170),rgb(26, 115, 232));padding:60px 0;color:#fff">
+    <div class="container">
+      <div class="breadcrumb" style="color:rgba(255,255,255,0.6);font-size:13px;margin-bottom:10px">
+        <a href="{{ url_for('index') }}" style="color:var(--gold)">Home</a> / Rooms
+      </div>
+      <h1 style="color:#fff;font-size:38px">Our Rooms & Suites</h1>
+    </div>
+  </div>
+
+  <section style="padding:48px 0">
+    <div class="container">
+      <!-- Filter bar -->
+      <form method="get" class="search-box rooms-filter-bar" style="margin-bottom:20px;box-shadow:var(--shadow-md)">
+        <div class="search-field">
+          <label>Check-in</label>
+          <input type="date" name="check_in" value="{{ check_in or '' }}">
+        </div>
+        <div class="search-field">
+          <label>Check-out</label>
+          <input type="date" name="check_out" value="{{ check_out or '' }}">
+        </div>
+        <div class="search-field">
+          <label>Search</label>
+          <input type="text" name="q" value="{{ q or '' }}" placeholder="Room name or type">
+        </div>
+        <div class="search-field">
+          <label>Max price</label>
+          <input type="number" name="max_price" value="{{ max_price or '' }}" placeholder="€ any">
+        </div>
+        <div class="search-field">
+          <label>Guests</label>
+          <select name="guests">
+            <option value="">Any</option>
+            {% for n in range(1,6) %}<option value="{{ n }}" {{ 'selected' if guests==n }}>{{ n }}+</option>{% endfor %}
+          </select>
+        </div>
+        <button class="search-btn" type="submit">Filter</button>
+      </form>
+
+      {% if date_error %}
+      <div style="background:#fdecea;color:#b3261e;border:1px solid #f5c6c2;border-radius:var(--radius);padding:12px 18px;font-size:14px;margin-bottom:24px">⚠️ {{ date_error }}</div>
+      {% elif check_in and check_out %}
+      <p style="color:var(--gray-500);font-size:14px;margin-bottom:24px">
+        ✅ Showing rooms available from <strong>{{ check_in }}</strong> to <strong>{{ check_out }}</strong>
+      </p>
+      {% endif %}
+
+      {% if rooms %}
+      <div class="rooms-grid">
+        {% for room in rooms %}
+        <a class="room-card" href="{{ url_for('room_detail', room_id=room.id) }}">
+          <div class="room-img">
+            {% set cover = room.image_url() or (room.photo_urls()[0] if room.photo_urls() else None) %}
+            {% if cover %}<img src="{{ cover }}" alt="{{ room.name }}">
+            {% else %}<span class="room-img-placeholder">🛏️</span>{% endif %}
+            <div class="room-img-badge"><span class="badge badge-gold">{{ room.room_type }}</span></div>
+          </div>
+          <div class="room-body">
+            <div class="room-name">{{ room.name }}</div>
+            <div class="room-meta">
+              <span>👤 {{ room.capacity }}</span><span>🛏️ {{ room.beds }}</span><span>📐 {{ room.size_sqm }}m²</span>
+            </div>
+            <div class="room-amenities">
+              {% for a in room.amenity_list()[:3] %}<span class="amenity-tag">{{ a }}</span>{% endfor %}
+            </div>
+            <div class="room-footer">
+              <div class="room-price">€{{ '%.0f'|format(room.price) }}<span>/night</span></div>
+              <div class="room-stars">★ {{ '%.1f'|format(room.rating) }}</div>
+            </div>
+          </div>
+        </a>
+        {% endfor %}
+      </div>
+      {% else %}
+      <div class="empty-state"><h3>No rooms match your filters</h3><p>Try widening your search.</p></div>
+      {% endif %}
+    </div>
+  </section>
+</div>
+{% endblock %}

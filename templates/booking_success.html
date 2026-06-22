@@ -1,0 +1,37 @@
+{% extends "base.html" %}
+{% block title %}Booking Confirmed — RigaNest{% endblock %}
+
+{% block content %}
+<div class="page page-wrap">
+  <div class="container" style="padding-top:60px;max-width:560px;text-align:center">
+    <div style="width:84px;height:84px;border-radius:50%;background:var(--success-soft);color:var(--success);font-size:42px;display:flex;align-items:center;justify-content:center;margin:0 auto 24px">✓</div>
+    <h1 style="font-size:34px;margin-bottom:10px">Booking confirmed!</h1>
+    <p style="color:var(--gray-500);margin-bottom:30px">A confirmation has been saved to your account.</p>
+
+    <div style="background:#fff;border:1px solid var(--gray-100);border-radius:var(--radius-lg);padding:28px;box-shadow:var(--shadow-sm);text-align:left">
+      <div style="display:flex;justify-content:space-between;margin-bottom:12px">
+        <span style="color:var(--gray-500)">Room</span><strong>{{ booking.room.name }}</strong>
+      </div>
+      <div style="display:flex;justify-content:space-between;margin-bottom:12px">
+        <span style="color:var(--gray-500)">Dates</span>
+        <strong>{{ booking.check_in.strftime('%d %b') }} → {{ booking.check_out.strftime('%d %b %Y') }}</strong>
+      </div>
+      <div style="display:flex;justify-content:space-between;margin-bottom:12px">
+        <span style="color:var(--gray-500)">Guests</span><strong>{{ booking.guests }}</strong>
+      </div>
+      <div style="display:flex;justify-content:space-between;margin-bottom:12px">
+        <span style="color:var(--gray-500)">Payment</span><span class="badge badge-green">{{ booking.payment_status }}</span>
+      </div>
+      <hr style="border:none;border-top:1px solid var(--gray-100);margin:14px 0">
+      <div style="display:flex;justify-content:space-between;font-weight:700;font-size:20px">
+        <span>Total paid</span><span class="room-price">€{{ '%.0f'|format(booking.total_price) }}</span>
+      </div>
+    </div>
+
+    <div style="display:flex;gap:12px;margin-top:28px">
+      <a href="{{ url_for('dashboard') }}" class="btn-primary" style="flex:1;justify-content:center">View My Bookings</a>
+      <a href="{{ url_for('rooms') }}" class="btn-secondary" style="flex:1;justify-content:center">Book Another</a>
+    </div>
+  </div>
+</div>
+{% endblock %}

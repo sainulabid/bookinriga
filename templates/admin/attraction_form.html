@@ -1,0 +1,82 @@
+{% extends "base.html" %}
+{% block title %}{{ 'Edit' if attraction else 'Add' }} Attraction — RigaNest{% endblock %}
+
+{% block content %}
+<div class="page page-wrap">
+  <div class="container admin-shell" style="max-width:760px">
+    <a href="{{ url_for('admin_attractions') }}" style="color:var(--primary);font-size:14px;font-weight:600">← Back to attractions</a>
+    <h1 style="font-size:30px;margin:14px 0 24px">{{ 'Edit attraction' if attraction else 'Add an attraction' }}</h1>
+
+    <form method="post" enctype="multipart/form-data" style="background:#fff;border:1px solid var(--gray-100);border-radius:var(--radius-lg);padding:30px;box-shadow:var(--shadow-sm)">
+      <div class="form-group"><label>Attraction name</label><input type="text" name="name" required value="{{ attraction.name if attraction else '' }}"></div>
+      <div class="form-group"><label>Location (for the map &amp; directions)</label><input type="text" name="location" placeholder="Riga Old Town, Latvia" value="{{ attraction.location if attraction else '' }}"></div>
+      <div class="form-group"><label>Summary</label><textarea name="summary" placeholder="A short description shown on the detail page…">{{ attraction.summary if attraction else '' }}</textarea></div>
+
+      <h3 style="font-size:16px;margin:26px 0 14px">General Information</h3>
+      <div class="form-row">
+        <label class="filter-check" style="display:flex;align-items:center;gap:10px;font-size:14px">
+          <input type="checkbox" name="allow_children" style="width:auto" {{ 'checked' if (attraction and attraction.allow_children) or not attraction }}> Allow children
+        </label>
+        <label class="filter-check" style="display:flex;align-items:center;gap:10px;font-size:14px">
+          <input type="checkbox" name="allow_smoking" style="width:auto" {{ 'checked' if attraction and attraction.allow_smoking }}> Allow smoking
+        </label>
+      </div>
+      <div class="form-row" style="margin-top:14px">
+        <label class="filter-check" style="display:flex;align-items:center;gap:10px;font-size:14px">
+          <input type="checkbox" name="allow_pets" style="width:auto" {{ 'checked' if attraction and attraction.allow_pets }}> Allow pets
+        </label>
+        <label class="filter-check" style="display:flex;align-items:center;gap:10px;font-size:14px">
+          <input type="checkbox" name="has_parking" style="width:auto" {{ 'checked' if (attraction and attraction.has_parking) or not attraction }}> Has parking
+        </label>
+      </div>
+      <div style="margin-top:14px">
+        <label class="filter-check" style="display:flex;align-items:center;gap:10px;font-size:14px">
+          <input type="checkbox" name="has_handicap" style="width:auto" {{ 'checked' if (attraction and attraction.has_handicap) or not attraction }}> Has handicap facilities
+        </label>
+      </div>
+
+      <h3 style="font-size:16px;margin:26px 0 14px">Booking Information</h3>
+      <div class="form-row">
+        <div class="form-group"><label>Opening time</label><input type="text" name="opening_time" placeholder="All Day / 09:00" value="{{ attraction.opening_time if attraction else 'All Day' }}"></div>
+        <div class="form-group"><label>Closing time</label><input type="text" name="closing_time" placeholder="All Day / 18:00" value="{{ attraction.closing_time if attraction else 'All Day' }}"></div>
+      </div>
+      <div class="form-row-3">
+        <div class="form-group"><label>Adult price</label><input type="text" name="adult_price" placeholder="Free / €5" value="{{ attraction.adult_price if attraction else 'Free' }}"></div>
+        <div class="form-group"><label>Children price</label><input type="text" name="children_price" placeholder="Free / €2" value="{{ attraction.children_price if attraction else 'Free' }}"></div>
+        <div class="form-group"><label>OAP price</label><input type="text" name="oap_price" placeholder="Free / €3" value="{{ attraction.oap_price if attraction else 'Free' }}"></div>
+      </div>
+      <div class="form-group"><label>Booking / ticket link (optional — leave empty to show a WhatsApp enquiry button instead)</label><input type="url" name="booking_url" placeholder="https://…" value="{{ attraction.booking_url if attraction else '' }}"></div>
+
+      <div class="form-group">
+        <label>Cover photo {{ '(leave empty to keep current)' if attraction and attraction.image else '' }}</label>
+        <input type="file" name="image" accept="image/*">
+        {% if attraction and attraction.image_url() %}<img src="{{ attraction.image_url() }}" style="margin-top:12px;height:110px;border-radius:var(--radius);object-fit:cover">{% endif %}
+      </div>
+
+      <div class="form-group">
+        <label>Extra photos for the slideshow (select several)</label>
+        <input type="file" name="photos" accept="image/*" multiple>
+      </div>
+
+      <label class="filter-check" style="display:flex;align-items:center;gap:10px;margin-bottom:20px;font-size:14px">
+        <input type="checkbox" name="is_active" style="width:auto" {{ 'checked' if (attraction and attraction.is_active) or not attraction }}> Visible to guests
+      </label>
+      <button type="submit" class="btn-primary">{{ 'Save changes' if attraction else 'Create attraction' }}</button>
+    </form>
+
+    {% if attraction and attraction.photos %}
+    <h3 style="margin:30px 0 14px;font-size:20px">Current slideshow photos</h3>
+    <div style="display:flex;gap:14px;flex-wrap:wrap">
+      {% for p in attraction.photos %}
+      <div style="position:relative">
+        <img src="{{ url_for('static', filename=p.filename) }}" style="height:90px;width:130px;object-fit:cover;border-radius:8px">
+        <form method="post" action="{{ url_for('admin_delete_attraction_photo', photo_id=p.id) }}" style="position:absolute;top:4px;right:4px">
+          <button title="Remove" style="background:rgba(192,57,43,.92);color:#fff;border:none;width:24px;height:24px;border-radius:50%;cursor:pointer;font-weight:700">×</button>
+        </form>
+      </div>
+      {% endfor %}
+    </div>
+    {% endif %}
+  </div>
+</div>
+{% endblock %}

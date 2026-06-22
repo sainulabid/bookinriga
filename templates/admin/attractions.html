@@ -1,0 +1,48 @@
+{% extends "base.html" %}
+{% block title %}Admin Attractions — RigaNest{% endblock %}
+
+{% block content %}
+<div class="page page-wrap">
+  <div class="container admin-shell">
+    <h1 style="font-size:32px">Attractions</h1>
+    <div class="admin-tabs">
+      <a href="{{ url_for('admin_dashboard') }}">Overview</a>
+      <a href="{{ url_for('admin_rooms') }}">Rooms</a>
+      <a href="{{ url_for('admin_attractions') }}" class="active">Attractions</a>
+      <a href="{{ url_for('admin_bookings') }}">Bookings</a>
+      <a href="{{ url_for('admin_users') }}">Users</a>
+      <a href="{{ url_for('admin_messages') }}">Messages</a>
+      <a href="{{ url_for('admin_settings') }}">Settings</a>
+    </div>
+
+    <div style="display:flex;justify-content:flex-end;margin-bottom:16px">
+      <a href="{{ url_for('admin_add_attraction') }}" class="btn-gold">+ Add Attraction</a>
+    </div>
+
+    {% if attractions %}
+    <table class="admin-table">
+      <thead><tr><th>Attraction</th><th>Location</th><th>Adult Price</th><th>Status</th><th></th></tr></thead>
+      <tbody>
+        {% for a in attractions %}
+        <tr>
+          <td style="font-weight:600">{{ a.name }}</td>
+          <td>{{ a.location }}</td>
+          <td>{{ a.adult_price }}</td>
+          <td>{% if a.is_active %}<span class="badge badge-green">Active</span>{% else %}<span class="badge badge-red">Hidden</span>{% endif %}</td>
+          <td style="display:flex;gap:8px">
+            <a href="{{ url_for('attraction_detail', attraction_id=a.id) }}" class="btn-sm btn-secondary" style="padding:6px 14px">View</a>
+            <a href="{{ url_for('admin_edit_attraction', attraction_id=a.id) }}" class="btn-sm btn-secondary" style="padding:6px 14px">Edit</a>
+            <form method="post" action="{{ url_for('admin_delete_attraction', attraction_id=a.id) }}" onsubmit="return confirm('Delete this attraction?');">
+              <button class="btn-sm" style="background:var(--danger-soft);color:var(--danger);border:none;padding:7px 14px;border-radius:var(--radius);font-weight:600;cursor:pointer">Delete</button>
+            </form>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    {% else %}
+    <div class="empty-state"><h3>No attractions yet</h3><a href="{{ url_for('admin_add_attraction') }}" class="btn-primary" style="margin-top:16px">+ Add Attraction</a></div>
+    {% endif %}
+  </div>
+</div>
+{% endblock %}

@@ -1,0 +1,342 @@
+{% extends "base.html" %}
+{% block title %}{{ room.name }} — RigaNest{% endblock %}
+{% block head %}
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css">
+{% endblock %}
+
+{% block content %}
+<div class="page page-wrap">
+  <div class="container" style="padding-top:40px">
+    <div class="breadcrumb" style="font-size:13px;color:var(--gray-500);margin-bottom:20px">
+      <a href="{{ url_for('index') }}" style="color:var(--primary)">Home</a> /
+      <a href="{{ url_for('rooms') }}" style="color:var(--primary)">Rooms</a> / {{ room.name }}
+    </div>
+
+    <div class="room-detail-grid" style="align-items:start">
+      <div>
+        <!-- PHOTO SLIDESHOW -->
+        <div class="detail-slider" id="slider">
+          {% if photos %}
+            {% for p in photos %}
+            <div class="detail-slide{% if loop.first %} active{% endif %}" style="background-image:url('{{ p }}')"></div>
+            {% endfor %}
+            {% if photos|length > 1 %}
+            <button class="detail-arrow prev" onclick="slide(-1)">‹</button>
+            <button class="detail-arrow next" onclick="slide(1)">›</button>
+            {% endif %}
+          {% else %}
+            <div class="detail-slide active" style="background:linear-gradient(135deg,rgb(26, 115, 232),#3a5bd4);display:flex;align-items:center;justify-content:center;font-size:90px">🛏️</div>
+          {% endif %}
+        </div>
+        {% if photos and photos|length > 1 %}
+        <div class="detail-thumbs" id="thumbs">
+          {% for p in photos %}
+          <div class="detail-thumb{% if loop.first %} active{% endif %}" data-i="{{ loop.index0 }}" style="background-image:url('{{ p }}')"></div>
+          {% endfor %}
+        </div>
+        {% endif %}
+
+        <div style="margin-top:28px">
+          <span class="badge badge-gold">{{ room.room_type }}</span>
+          <h1 style="font-size:34px;margin:14px 0 8px">{{ room.name }}</h1>
+          <div class="room-meta" style="font-size:14px;color:var(--gray-500);gap:20px">
+            <span>👤 {{ room.capacity }} guests</span>
+            <span>🛏️ {{ room.beds }} bed{{ 's' if room.beds > 1 }}</span>
+            <span>📐 {{ room.size_sqm }}m²</span>
+            <span style="color:var(--gold)">★ {{ '%.1f'|format(room.rating) }}</span>
+          </div>
+          <p style="margin-top:18px;color:var(--gray-700);line-height:1.8">{{ room.description }}</p>
+        </div>
+
+        <!-- AVAILABILITY CALENDAR -->
+        <div class="avail-cal">
+          <div class="avail-cal-heading">📅 Availability</div>
+          <div class="avail-cal-head">
+            <button type="button" class="avail-cal-nav" id="calPrev" aria-label="Previous month">‹</button>
+            <div class="avail-cal-title" id="calTitle"></div>
+            <button type="button" class="avail-cal-nav" id="calNext" aria-label="Next month">›</button>
+          </div>
+          <div class="avail-cal-grid" id="calGrid"></div>
+          <div class="avail-cal-legend">
+            <span class="avail-cal-legend-item"><span class="avail-cal-dot available"></span> Available</span>
+            <span class="avail-cal-legend-item"><span class="avail-cal-dot booked"></span> Booked</span>
+            <span class="avail-cal-legend-item"><span class="avail-cal-dot past"></span> Past</span>
+          </div>
+        </div>
+
+        <!-- TABS -->
+        <div class="tabs">
+          <div class="tab-btns">
+            <button class="tab-btn active" data-tab="amenities">Amenities</button>
+            <button class="tab-btn" data-tab="internet">Internet</button>
+            <button class="tab-btn" data-tab="kitchen">Kitchen</button>
+            <button class="tab-btn" data-tab="suitability">Suitability</button>
+          </div>
+          <div class="tab-panel active" data-panel="amenities">
+            {% for a in room.amenity_list() %}<span class="tab-chip">✓ {{ a }}</span>{% endfor %}
+            <span class="tab-chip">✓ Air conditioning</span>
+            <span class="tab-chip">✓ Daily housekeeping</span>
+            <span class="tab-chip">✓ 24/7 reception</span>
+          </div>
+          <div class="tab-panel" data-panel="internet">
+            <span class="tab-chip">✓ Free high-speed WiFi</span>
+            <span class="tab-chip">✓ Wired internet</span>
+            <span class="tab-chip">✓ Smart TV with streaming</span>
+          </div>
+          <div class="tab-panel" data-panel="kitchen">
+            <span class="tab-chip">✓ Kettle & coffee maker</span>
+            <span class="tab-chip">✓ Minibar</span>
+            <span class="tab-chip">✓ Complimentary water</span>
+            <span class="tab-chip">✓ Breakfast available</span>
+          </div>
+          <div class="tab-panel" data-panel="suitability">
+            <span class="tab-chip">✓ Non-smoking</span>
+            <span class="tab-chip">✓ Families welcome</span>
+            <span class="tab-chip">✗ Pets not allowed</span>
+            <span class="tab-chip">✗ Parties not allowed</span>
+          </div>
+        </div>
+
+        <!-- TERMS ACCORDION -->
+        <h3 style="margin:34px 0 6px;font-size:22px">Terms</h3>
+        <div class="accordion">
+          <div class="acc-item">
+            <div class="acc-head" onclick="toggleAcc(this)"><span class="pm">+</span> General terms</div>
+            <div class="acc-body">
+              Check-in is from 2:00 PM and check-out is until 11:00 AM. A valid ID and the
+              card used for booking are required at arrival. Quiet hours are between 10:00 PM and 8:00 AM.
+            </div>
+          </div>
+          <div class="acc-item">
+            <div class="acc-head" onclick="toggleAcc(this)"><span class="pm">+</span> Rules</div>
+            <div class="acc-body">
+              <ul>
+                <li>No smoking inside the room.</li>
+                <li>Maximum occupancy is {{ room.capacity }} guests.</li>
+                <li>Pets are not allowed.</li>
+                <li>Please respect quiet hours and other guests.</li>
+              </ul>
+            </div>
+          </div>
+          <div class="acc-item">
+            <div class="acc-head" onclick="toggleAcc(this)"><span class="pm">+</span> Cancellation</div>
+            <div class="acc-body">
+              <ul>
+                <li>Cancel more than 7 days before check-in: full refund.</li>
+                <li>Cancel less than 7 days before check-in: prepayment is non-refundable.</li>
+                <li>Early departure: remaining nights are non-refundable.</li>
+                <li>No-show: the full amount is charged and is non-refundable.</li>
+              </ul>
+            </div>
+          </div>
+        </div>
+
+        <!-- LOCATION MAP -->
+        {% if room.location %}
+        <h3 style="margin:34px 0 6px;font-size:22px">Location</h3>
+        <p style="color:var(--gray-500);font-size:14px">📍 {{ room.location }}</p>
+        <iframe class="map-frame" loading="lazy"
+          src="https://maps.google.com/maps?q={{ room.location|urlencode }}&output=embed"></iframe>
+        {% endif %}
+      </div>
+
+      <!-- RIGHT SIDEBAR: BOOK BOX + RELATED ROOMS -->
+      <div style="position:sticky;top:90px">
+        <div class="summary-card" style="background:#fff;border:1px solid var(--gray-100);border-radius:var(--radius-lg);padding:28px;box-shadow:var(--shadow-md)">
+          <div class="room-price" style="font-size:32px">€{{ '%.0f'|format(room.price) }}<span style="font-size:15px">/night</span></div>
+          <p style="color:var(--gray-500);font-size:14px;margin:8px 0 20px">Taxes & fees calculated at checkout.</p>
+
+          <!-- INLINE BOOK NOW FORM (no extra page) -->
+          <form method="post" action="{{ url_for('booking', room_id=room.id) }}" id="inlineBookForm">
+            <div class="form-group">
+              <label>Check-in</label>
+              <input type="text" id="ib_check_in" name="check_in" placeholder="Select check-in date" required readonly>
+            </div>
+            <div class="form-group">
+              <label>Check-out</label>
+              <input type="text" id="ib_check_out" name="check_out" placeholder="Select check-out date" required readonly>
+            </div>
+            <div class="form-group">
+              <label>Guests</label>
+              <select name="guests">
+                {% for n in range(1, room.capacity + 1) %}<option value="{{ n }}">{{ n }} guest{{ 's' if n > 1 }}</option>{% endfor %}
+              </select>
+            </div>
+            <div id="ibSummaryLine" style="color:var(--gray-500);font-size:13px;margin-bottom:12px">Select dates to see total</div>
+            <button type="submit" class="btn-primary btn-full">Book Now</button>
+          </form>
+          <div style="text-align:center;margin-top:14px"><span class="pay-badge">🔒 Secure Stripe checkout</span></div>
+
+          <!-- NEED HELP? -->
+          <div class="help-box">
+            <h3>Need Help?</h3>
+            <div class="help-box-divider"></div>
+            <div class="help-icons">
+              <a class="help-icon email" href="mailto:hello@riganest.com?subject={{ ('Question about ' ~ room.name)|urlencode }}" aria-label="Email us" title="Email us">✉️</a>
+              <a class="help-icon whatsapp" href="https://wa.me/{{ whatsapp_digits }}?text={{ ('Hi! I have a question about ' ~ room.name ~ '.')|urlencode }}" target="_blank" rel="noopener" aria-label="WhatsApp us" title="WhatsApp us">
+                <svg viewBox="0 0 32 32" width="20" height="20" fill="#25D366" aria-hidden="true">
+                  <path d="M16.04 3C9.37 3 3.96 8.41 3.96 15.08c0 2.27.62 4.43 1.78 6.32L3 29l7.78-2.65a12.04 12.04 0 0 0 5.26 1.21h.01c6.67 0 12.08-5.41 12.08-12.08C28.13 8.41 22.72 3 16.04 3zm0 21.99h-.01a9.9 9.9 0 0 1-5.05-1.39l-.36-.21-4.62 1.57 1.55-4.5-.24-.37a9.86 9.86 0 0 1-1.51-5.21c0-5.46 4.45-9.91 9.93-9.91 2.65 0 5.14 1.04 7.02 2.91a9.84 9.84 0 0 1 2.9 7.01c0 5.46-4.45 9.91-9.91 9.91zm5.44-7.42c-.3-.15-1.77-.87-2.04-.97-.27-.1-.47-.15-.67.15-.2.3-.77.97-.94 1.17-.17.2-.35.22-.65.07-.3-.15-1.26-.46-2.39-1.47-.88-.79-1.48-1.76-1.65-2.06-.17-.3-.02-.46.13-.61.13-.13.3-.35.45-.52.15-.17.2-.3.3-.5.1-.2.05-.37-.02-.52-.07-.15-.67-1.61-.92-2.21-.24-.58-.49-.5-.67-.51h-.57c-.2 0-.52.07-.79.37s-1.04 1.02-1.04 2.48 1.07 2.87 1.22 3.07c.15.2 2.1 3.2 5.08 4.49.71.31 1.26.49 1.69.62.71.23 1.36.2 1.87.12.57-.09 1.77-.72 2.02-1.42.25-.7.25-1.3.17-1.42-.07-.13-.27-.2-.57-.35z"/>
+                </svg>
+              </a>
+            </div>
+            <p>Having issues with your booking? Contact us for assistance.</p>
+          </div>
+        </div>
+
+        <!-- RELATED ROOMS -->
+        {% if related_rooms %}
+        <div style="margin-top:28px">
+          <div class="related-rooms-title">Related Rooms</div>
+          {% for r in related_rooms %}
+          <a class="related-room-card" href="{{ url_for('room_detail', room_id=r.id) }}">
+            {% set rcover = r.image_url() or (r.photo_urls()[0] if r.photo_urls() else None) %}
+            {% if rcover %}
+              <img class="related-room-thumb" src="{{ rcover }}" alt="{{ r.name }}">
+            {% else %}
+              <span class="related-room-thumb-placeholder">🛏️</span>
+            {% endif %}
+            <div class="related-room-info">
+              <div class="related-room-name">{{ r.name }}</div>
+              <span class="btn-related">View Details</span>
+            </div>
+          </a>
+          {% endfor %}
+        </div>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
+<script>
+  // Inline "Book Now" date pickers + live price summary
+  (function () {
+    const price = {{ room.price }};
+    const line = document.getElementById('ibSummaryLine');
+    function update(a, b) {
+      if (!a || !b || !line) return;
+      const n = Math.round((b - a) / 86400000);
+      if (n > 0) {
+        line.textContent = '€' + price.toFixed(0) + ' × ' + n + ' night' + (n > 1 ? 's' : '') + ' = €' + (n * price).toFixed(0);
+      }
+    }
+    const ci = flatpickr('#ib_check_in', {
+      minDate: 'today', dateFormat: 'Y-m-d',
+      onChange: d => { if (d[0]) { co.set('minDate', new Date(d[0]).fp_incr(1)); update(d[0], co.selectedDates[0]); } }
+    });
+    const co = flatpickr('#ib_check_out', {
+      minDate: new Date().fp_incr(1), dateFormat: 'Y-m-d',
+      onChange: d => update(ci.selectedDates[0], d[0])
+    });
+  })();
+
+  // Photo slideshow
+  var slides=document.querySelectorAll('#slider .detail-slide');
+  var thumbs=document.querySelectorAll('#thumbs .detail-thumb');
+  var cur=0;
+  function show(i){
+    if(!slides.length) return;
+    slides.forEach(s=>s.classList.remove('active'));
+    thumbs.forEach(t=>t.classList.remove('active'));
+    cur=(i+slides.length)%slides.length;
+    slides[cur].classList.add('active');
+    if(thumbs[cur]) thumbs[cur].classList.add('active');
+  }
+  function slide(d){ show(cur+d); }
+  thumbs.forEach(t=>t.addEventListener('click',()=>show(parseInt(t.dataset.i))));
+  if(slides.length>1) setInterval(()=>show(cur+1),4500);
+
+  // Tabs
+  document.querySelectorAll('.tab-btn').forEach(b=>{
+    b.addEventListener('click',()=>{
+      document.querySelectorAll('.tab-btn').forEach(x=>x.classList.remove('active'));
+      document.querySelectorAll('.tab-panel').forEach(x=>x.classList.remove('active'));
+      b.classList.add('active');
+      document.querySelector('.tab-panel[data-panel="'+b.dataset.tab+'"]').classList.add('active');
+    });
+  });
+
+  // Accordion
+  function toggleAcc(head){
+    var body=head.nextElementSibling;
+    var open=body.classList.contains('open');
+    body.classList.toggle('open');
+    head.querySelector('.pm').textContent=open?'+':'–';
+  }
+
+  // Availability calendar
+  (function(){
+    var bookedRanges = {{ booked_ranges|default([])|tojson }};
+    var today = new Date();
+    today.setHours(0,0,0,0);
+    var viewDate = new Date(today.getFullYear(), today.getMonth(), 1);
+
+    var titleEl = document.getElementById('calTitle');
+    var gridEl  = document.getElementById('calGrid');
+    var prevBtn = document.getElementById('calPrev');
+    var nextBtn = document.getElementById('calNext');
+    if (!gridEl) return;
+
+    function isBooked(d){
+      return bookedRanges.some(function(r){
+        var from = new Date(r.from), to = new Date(r.to);
+        from.setHours(0,0,0,0); to.setHours(0,0,0,0);
+        return d >= from && d < to;
+      });
+    }
+
+    function renderCalendar(){
+      var year = viewDate.getFullYear(), month = viewDate.getMonth();
+      titleEl.textContent = viewDate.toLocaleString('en-US', { month: 'long', year: 'numeric' });
+      gridEl.innerHTML = '';
+
+      ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'].forEach(function(dow){
+        var el = document.createElement('div');
+        el.className = 'avail-cal-dow';
+        el.textContent = dow;
+        gridEl.appendChild(el);
+      });
+
+      var firstDow = new Date(year, month, 1).getDay();
+      var daysInMonth = new Date(year, month + 1, 0).getDate();
+
+      for (var i = 0; i < firstDow; i++) {
+        var empty = document.createElement('div');
+        empty.className = 'avail-cal-day empty';
+        gridEl.appendChild(empty);
+      }
+
+      for (var day = 1; day <= daysInMonth; day++) {
+        var d = new Date(year, month, day);
+        var cell = document.createElement('div');
+        var cls = 'avail-cal-day';
+        if (d < today) {
+          cls += ' past';
+        } else if (isBooked(d)) {
+          cls += ' booked';
+        } else {
+          cls += ' available';
+        }
+        if (d.getTime() === today.getTime()) cls += ' today';
+        cell.className = cls;
+        cell.textContent = day;
+        gridEl.appendChild(cell);
+      }
+    }
+
+    prevBtn.addEventListener('click', function(){
+      viewDate.setMonth(viewDate.getMonth() - 1);
+      renderCalendar();
+    });
+    nextBtn.addEventListener('click', function(){
+      viewDate.setMonth(viewDate.getMonth() + 1);
+      renderCalendar();
+    });
+
+    renderCalendar();
+  })();
+</script>
+{% endblock %}

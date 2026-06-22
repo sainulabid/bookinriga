@@ -1,0 +1,50 @@
+{% extends "base.html" %}
+{% block title %}Admin Bookings — RigaNest{% endblock %}
+
+{% block content %}
+<div class="page page-wrap">
+  <div class="container admin-shell">
+    <h1 style="font-size:32px">All Bookings</h1>
+    <div class="admin-tabs">
+      <a href="{{ url_for('admin_dashboard') }}">Overview</a>
+      <a href="{{ url_for('admin_rooms') }}">Rooms</a>
+      <a href="{{ url_for('admin_attractions') }}">Attractions</a>
+      <a href="{{ url_for('admin_bookings') }}" class="active">Bookings</a>
+      <a href="{{ url_for('admin_users') }}">Users</a>
+      <a href="{{ url_for('admin_messages') }}">Messages</a>
+      <a href="{{ url_for('admin_settings') }}">Settings</a>
+    </div>
+
+    {% if bookings %}
+    <table class="admin-table">
+      <thead><tr><th>#</th><th>Guest</th><th>Phone</th><th>Room</th><th>Dates</th><th>Total</th><th>Payment</th><th>Status</th><th></th></tr></thead>
+      <tbody>
+        {% for b in bookings %}
+        <tr>
+          <td>{{ b.id }}</td>
+          <td>{{ b.user.name }}</td>
+          <td>{{ b.user.phone }}</td>
+          <td>{{ b.room.name }}</td>
+          <td>{{ b.check_in.strftime('%d %b') }} → {{ b.check_out.strftime('%d %b %Y') }}</td>
+          <td>€{{ '%.0f'|format(b.total_price) }}</td>
+          <td><span class="badge {{ 'badge-green' if b.payment_status=='Paid' else 'badge-gold' }}">{{ b.payment_status }}</span></td>
+          <td>
+            {% if b.status=='Confirmed' %}<span class="badge badge-green">Confirmed</span>
+            {% elif b.status=='Pending' %}<span class="badge badge-gold">Pending</span>
+            {% else %}<span class="badge badge-red">Cancelled</span>{% endif %}
+          </td>
+          <td>
+            {% if b.status=='Confirmed' %}
+            <form method="post" action="{{ url_for('cancel_confirmed', booking_id=b.id) }}" onsubmit="return confirm('Cancel?');">
+              <button class="btn-sm" style="background:var(--danger-soft);color:var(--danger);border:none;padding:6px 12px;border-radius:var(--radius);font-weight:600;cursor:pointer">Cancel</button>
+            </form>
+            {% endif %}
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    {% else %}<div class="empty-state"><h3>No bookings yet</h3></div>{% endif %}
+  </div>
+</div>
+{% endblock %}

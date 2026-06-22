@@ -1,0 +1,58 @@
+{% extends "base.html" %}
+{% block title %}Admin — RigaNest{% endblock %}
+
+{% block content %}
+<div class="page page-wrap">
+  <div class="container admin-shell">
+    <h1 style="font-size:32px">Admin Dashboard</h1>
+    <div class="admin-tabs">
+      <a href="{{ url_for('admin_dashboard') }}" class="active">Overview</a>
+      <a href="{{ url_for('admin_rooms') }}">Rooms</a>
+      <a href="{{ url_for('admin_attractions') }}">Attractions</a>
+      <a href="{{ url_for('admin_bookings') }}">Bookings</a>
+      <a href="{{ url_for('admin_users') }}">Users</a>
+      <a href="{{ url_for('admin_messages') }}">Messages</a>
+      <a href="{{ url_for('admin_settings') }}">Settings</a>
+    </div>
+
+    <div class="stat-grid">
+      <div class="stat-card"><div class="n">{{ stats.rooms }}</div><div class="l">Rooms</div></div>
+      <div class="stat-card"><div class="n">{{ stats.attractions }}</div><div class="l">Attractions</div></div>
+      <div class="stat-card"><div class="n">{{ stats.users }}</div><div class="l">Users</div></div>
+      <div class="stat-card"><div class="n">{{ stats.bookings }}</div><div class="l">Confirmed bookings</div></div>
+      <div class="stat-card"><div class="n">€{{ '%.0f'|format(stats.revenue) }}</div><div class="l">Revenue (paid)</div></div>
+    </div>
+
+    <div style="display:flex;justify-content:flex-end;gap:10px;margin-bottom:28px">
+      <a href="{{ url_for('admin_add_attraction') }}" class="btn-secondary">+ Add Attraction</a>
+      <a href="{{ url_for('admin_add_room') }}" class="btn-gold">+ Add Room</a>
+    </div>
+
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">
+      <h2 style="font-size:22px">Recent bookings</h2>
+    </div>
+
+    {% if recent %}
+    <table class="admin-table">
+      <thead><tr><th>Guest</th><th>Room</th><th>Dates</th><th>Total</th><th>Payment</th><th>Status</th></tr></thead>
+      <tbody>
+        {% for b in recent %}
+        <tr>
+          <td>{{ b.user.name }}</td>
+          <td>{{ b.room.name }}</td>
+          <td>{{ b.check_in.strftime('%d %b') }} → {{ b.check_out.strftime('%d %b') }}</td>
+          <td>€{{ '%.0f'|format(b.total_price) }}</td>
+          <td><span class="badge {{ 'badge-green' if b.payment_status=='Paid' else 'badge-gold' }}">{{ b.payment_status }}</span></td>
+          <td>
+            {% if b.status=='Confirmed' %}<span class="badge badge-green">Confirmed</span>
+            {% elif b.status=='Pending' %}<span class="badge badge-gold">Pending</span>
+            {% else %}<span class="badge badge-red">Cancelled</span>{% endif %}
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    {% else %}<div class="empty-state"><p>No bookings yet.</p></div>{% endif %}
+  </div>
+</div>
+{% endblock %}

@@ -1,0 +1,49 @@
+{% extends "base.html" %}
+{% block title %}Admin Rooms — RigaNest{% endblock %}
+
+{% block content %}
+<div class="page page-wrap">
+  <div class="container admin-shell">
+    <h1 style="font-size:32px">Rooms</h1>
+    <div class="admin-tabs">
+      <a href="{{ url_for('admin_dashboard') }}">Overview</a>
+      <a href="{{ url_for('admin_rooms') }}" class="active">Rooms</a>
+      <a href="{{ url_for('admin_attractions') }}">Attractions</a>
+      <a href="{{ url_for('admin_bookings') }}">Bookings</a>
+      <a href="{{ url_for('admin_users') }}">Users</a>
+      <a href="{{ url_for('admin_messages') }}">Messages</a>
+      <a href="{{ url_for('admin_settings') }}">Settings</a>
+    </div>
+
+    <div style="display:flex;justify-content:flex-end;margin-bottom:16px">
+      <a href="{{ url_for('admin_add_room') }}" class="btn-gold">+ Add Room</a>
+    </div>
+
+    {% if rooms %}
+    <table class="admin-table">
+      <thead><tr><th>Room</th><th>Type</th><th>Price</th><th>Capacity</th><th>Rating</th><th>Status</th><th></th></tr></thead>
+      <tbody>
+        {% for r in rooms %}
+        <tr>
+          <td style="font-weight:600">{{ r.name }}</td>
+          <td>{{ r.room_type }}</td>
+          <td>€{{ '%.0f'|format(r.price) }}</td>
+          <td>{{ r.capacity }}</td>
+          <td>★ {{ '%.1f'|format(r.rating) }}</td>
+          <td>{% if r.is_active %}<span class="badge badge-green">Active</span>{% else %}<span class="badge badge-red">Hidden</span>{% endif %}</td>
+          <td style="display:flex;gap:8px">
+            <a href="{{ url_for('admin_edit_room', room_id=r.id) }}" class="btn-sm btn-secondary" style="padding:6px 14px">Edit</a>
+            <form method="post" action="{{ url_for('admin_delete_room', room_id=r.id) }}" onsubmit="return confirm('Delete this room?');">
+              <button class="btn-sm" style="background:var(--danger-soft);color:var(--danger);border:none;padding:7px 14px;border-radius:var(--radius);font-weight:600;cursor:pointer">Delete</button>
+            </form>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    {% else %}
+    <div class="empty-state"><h3>No rooms yet</h3><a href="{{ url_for('admin_add_room') }}" class="btn-primary" style="margin-top:16px">+ Add Room</a></div>
+    {% endif %}
+  </div>
+</div>
+{% endblock %}
