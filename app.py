@@ -1238,10 +1238,64 @@ def inject_globals():
 
 
 # ----------------------------------------------------------------------
+# Auto-migration: add any missing columns automatically on startup
+# ----------------------------------------------------------------------
+def auto_migrate():
+    """
+    Compares the SQLAlchemy models against the live database schema and
+    adds any missing columns with ALTER TABLE. This avoids needing shell
+    access on Render every time a new column is added to a model.
+    """
+    from sqlalchemy import inspect, text
+
+    type_map = {
+        "INTEGER": "INTEGER",
+        "VARCHAR": "VARCHAR(255)",
+        "TEXT": "TEXT",
+        "FLOAT": "FLOAT",
+        "BOOLEAN": "BOOLEAN",
+        "DATETIME": "TIMESTAMP",
+        "DATE": "DATE",
+    }
+
+    inspector = inspect(db.engine)
+    existing_tables = inspector.get_table_names()
+
+    for table_name, table in db.metadata.tables.items():
+        if table_name not in existing_tables:
+            continue  # brand-new table, db.create_all() already handles this
+        existing_columns = {c["name"] for c in inspector.get_columns(table_name)}
+        for column in table.columns:
+            if column.name in existing_columns:
+                continue
+            col_type = str(column.type).split("(")[0].upper()
+            sql_type = type_map.get(col_type, "TEXT")
+            default_clause = ""
+            if column.default is not None and getattr(column.default, "is_scalar", False):
+                val = column.default.arg
+                if isinstance(val, bool):
+                    default_clause = f" DEFAULT {'TRUE' if val else 'FALSE'}"
+                elif isinstance(val, (int, float)):
+                    default_clause = f" DEFAULT {val}"
+                elif isinstance(val, str):
+                    default_clause = f" DEFAULT '{val}'"
+            try:
+                db.session.execute(text(
+                    f'ALTER TABLE "{table_name}" ADD COLUMN "{column.name}" {sql_type}{default_clause}'
+                ))
+                db.session.commit()
+                print(f"[auto_migrate] Added column {table_name}.{column.name}")
+            except Exception as e:
+                db.session.rollback()
+                print(f"[auto_migrate] Could not add {table_name}.{column.name}: {e}")
+
+
+# ----------------------------------------------------------------------
 # First-run seed
 # ----------------------------------------------------------------------
 def seed():
     db.create_all()
+    auto_migrate()
     if not User.query.filter_by(email="admin@riganest.com").first():
         a = User(name="RigaNest Admin", email="admin@riganest.com",
                  phone="+10000000000", is_admin=True)
