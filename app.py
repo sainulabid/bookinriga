@@ -14,6 +14,8 @@ If these are not set, the app runs in DEV MODE:
 """
 
 import os
+import cloudinary
+import cloudinary.uploader
 import random
 import smtplib
 from email.mime.text import MIMEText
@@ -55,6 +57,11 @@ GMAIL_APP_PASSWORD = os.environ.get("GMAIL_APP_PASSWORD", "")
 GOOGLE_CLIENT_ID = os.environ.get("GOOGLE_CLIENT_ID", "")
 GOOGLE_CLIENT_SECRET = os.environ.get("GOOGLE_CLIENT_SECRET", "")
 
+CLOUDINARY_CLOUD_NAME = os.environ.get("CLOUDINARY_CLOUD_NAME", "")
+CLOUDINARY_API_KEY = os.environ.get("CLOUDINARY_API_KEY", "")
+CLOUDINARY_API_SECRET = os.environ.get("CLOUDINARY_API_SECRET", "")
+CLOUDINARY_ENABLED = bool(CLOUDINARY_CLOUD_NAME and CLOUDINARY_API_KEY and CLOUDINARY_API_SECRET)
+
 PAYMENTS_LIVE = bool(STRIPE_SECRET_KEY)
 EMAIL_LIVE = bool(GMAIL_ADDRESS and GMAIL_APP_PASSWORD)
 GOOGLE_LOGIN_ENABLED = bool(GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET)
@@ -65,11 +72,25 @@ WHATSAPP_NUMBER = os.environ.get("WHATSAPP_NUMBER", "+371 28 458 050")
 WHATSAPP_NUMBER_DIGITS = "".join(ch for ch in WHATSAPP_NUMBER if ch.isdigit())
 
 app = Flask(__name__)
+
+# Configure Cloudinary if keys are available
+if CLOUDINARY_ENABLED:
+    cloudinary.config(
+        cloud_name=CLOUDINARY_CLOUD_NAME,
+        api_key=CLOUDINARY_API_KEY,
+        api_secret=CLOUDINARY_API_SECRET,
+        secure=True
+    )
+
 app.config["SECRET_KEY"] = os.environ.get("SECRET_KEY", "change-this-secret-key")
-app.config["SQLALCHEMY_DATABASE_URI"] = "sqlite:///" + os.path.join(BASE_DIR, "riganest.db")
+DATABASE_URL = os.environ.get("DATABASE_URL", "sqlite:///" + os.path.join(BASE_DIR, "riganest.db"))
+# Render.com gives postgres:// but SQLAlchemy needs postgresql://
+if DATABASE_URL.startswith("postgres://"):
+    DATABASE_URL = DATABASE_URL.replace("postgres://", "postgresql://", 1)
+app.config["SQLALCHEMY_DATABASE_URI"] = DATABASE_URL
 app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
 app.config["UPLOAD_FOLDER"] = UPLOAD_FOLDER
-app.config["MAX_CONTENT_LENGTH"] = 8 * 1024 * 1024
+app.config["MAX_CONTENT_LENGTH"] = 50 * 1024 * 1024
 os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 os.makedirs(SLIDES_FOLDER, exist_ok=True)
 
@@ -110,10 +131,7 @@ class User(UserMixin, db.Model):
     phone = db.Column(db.String(30), default="")
     password_hash = db.Column(db.String(255), nullable=True)
     is_admin = db.Column(db.Boolean, default=False)
-    # Google OAuth ("Continue with Google") — set when the account was
-    # created/linked via Google sign-in instead of a password
     google_id = db.Column(db.String(120), default="")
-    # OTP fields
     otp_code = db.Column(db.String(6), default="")
     otp_expiry = db.Column(db.DateTime)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
@@ -137,6 +155,7 @@ class Room(db.Model):
     capacity = db.Column(db.Integer, default=2)
     beds = db.Column(db.Integer, default=1)
     size_sqm = db.Column(db.Integer, default=30)
+    bathrooms = db.Column(db.Integer, default=1)
     rating = db.Column(db.Float, default=4.8)
     amenities = db.Column(db.String(255), default="WiFi, AC, Breakfast")
     image = db.Column(db.String(255), default="")
@@ -147,18 +166,27 @@ class Room(db.Model):
     photos = db.relationship("RoomImage", backref="room", cascade="all, delete-orphan")
 
     def image_url(self):
-        return url_for("static", filename="uploads/" + self.image) if self.image else None
+        if not self.image:
+            return None
+        if self.image.startswith("http"):
+            return self.image
+        return url_for("static", filename="uploads/" + self.image)
 
     def amenity_list(self):
         return [a.strip() for a in self.amenities.split(",") if a.strip()]
 
     def photo_urls(self):
-        """All photos for the slideshow: extra photos + cover, fallback to cover only."""
-        urls = [url_for("static", filename=p.filename) for p in self.photos]
-        if self.image:
-            cover = url_for("static", filename="uploads/" + self.image)
-            if cover not in urls:
-                urls.insert(0, cover)
+        """Extra photos for the slideshow only. Cover shown separately."""
+        urls = []
+        for p in self.photos:
+            if p.filename.startswith("http"):
+                urls.append(p.filename)
+            else:
+                urls.append(url_for("static", filename=p.filename))
+        if not urls:
+            cover = self.image_url()
+            if cover:
+                urls.append(cover)
         return urls
 
 
@@ -170,8 +198,8 @@ class Booking(db.Model):
     check_out = db.Column(db.Date, nullable=False)
     guests = db.Column(db.Integer, default=1)
     total_price = db.Column(db.Float, default=0.0)
-    status = db.Column(db.String(40), default="Pending")        # Pending/Confirmed/Cancelled
-    payment_status = db.Column(db.String(40), default="Unpaid")  # Unpaid/Paid
+    status = db.Column(db.String(40), default="Pending")
+    payment_status = db.Column(db.String(40), default="Unpaid")
     stripe_session_id = db.Column(db.String(255), default="")
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
 
@@ -186,8 +214,6 @@ class RoomImage(db.Model):
 
 
 class Attraction(db.Model):
-    """A local attraction shown in the 'Take A Look Inside RigaNest'
-    gallery on the homepage and listed in full on the Attractions page."""
     id = db.Column(db.Integer, primary_key=True)
     name = db.Column(db.String(120), nullable=False)
     summary = db.Column(db.Text, default="")
@@ -211,17 +237,23 @@ class Attraction(db.Model):
     def image_url(self):
         if not self.image:
             return None
-        # Already a path relative to /static (e.g. seeded "gallery/g1.jpg")
+        if self.image.startswith("http"):
+            return self.image
         if "/" in self.image:
             return url_for("static", filename=self.image)
         return url_for("static", filename="uploads/" + self.image)
 
     def photo_urls(self):
         """All photos for the slideshow: extra photos + cover, fallback to cover only."""
-        urls = [url_for("static", filename=p.filename) for p in self.photos]
+        urls = []
+        for p in self.photos:
+            if p.filename.startswith("http"):
+                urls.append(p.filename)
+            else:
+                urls.append(url_for("static", filename=p.filename))
         cover = self.image_url()
         if cover and cover not in urls:
-                urls.insert(0, cover)
+            urls.insert(0, cover)
         return urls
 
 
@@ -240,6 +272,39 @@ class ContactMessage(db.Model):
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
 
 
+
+
+class SiteAbout(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    title = db.Column(db.String(200), default="About Us")
+    hero_subtitle = db.Column(db.String(200), default="Our Story")
+    content = db.Column(db.Text, default="")
+    image = db.Column(db.String(255), default="")
+    updated_at = db.Column(db.DateTime, default=datetime.utcnow)
+
+    def image_url(self):
+        if not self.image:
+            return None
+        if self.image.startswith("http"):
+            return self.image
+        return url_for("static", filename="uploads/" + self.image)
+
+
+
+class SitePage(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    slug = db.Column(db.String(80), unique=True, nullable=False)
+    title = db.Column(db.String(200), nullable=False)
+    content = db.Column(db.Text, default="")
+    image = db.Column(db.String(255), default="")
+    updated_at = db.Column(db.DateTime, default=datetime.utcnow)
+    def image_url(self):
+        if not self.image:
+            return None
+        if self.image.startswith("http"):
+            return self.image
+        return url_for("static", filename="uploads/" + self.image)
+
 @login_manager.user_loader
 def load_user(uid):
     return db.session.get(User, int(uid))
@@ -253,7 +318,6 @@ def allowed_file(fn):
 
 
 def get_banner_images():
-    """Filenames (sorted oldest→newest) of homepage banner images in static/slides."""
     if not os.path.isdir(SLIDES_FOLDER):
         return []
     files = [f for f in os.listdir(SLIDES_FOLDER) if allowed_file(f)]
@@ -290,7 +354,6 @@ def is_available(room_id, ci, co, exclude=None):
 
 
 def send_otp(user):
-    """Generate a 6-digit OTP, store it, and deliver via Gmail email (or console)."""
     code = f"{random.randint(0, 999999):06d}"
     user.otp_code = code
     user.otp_expiry = datetime.utcnow() + timedelta(minutes=5)
@@ -311,40 +374,50 @@ def send_otp(user):
             with smtplib.SMTP_SSL("smtp.gmail.com", 465) as server:
                 server.login(GMAIL_ADDRESS, GMAIL_APP_PASSWORD)
                 server.sendmail(GMAIL_ADDRESS, [user.email], msg.as_string())
-            return None  # delivered by email
+            return None
         except Exception as e:
             print("Gmail send failed:", e)
-    # DEV fallback: print to terminal and return code to show on screen
     print(f"\n*** [DEV OTP] {user.email} -> code: {code} ***\n")
     return code
 
 
-def upload_image(room):
+# ── FIXED: generic upload_image — works for both Room and Attraction ──
+def upload_image(obj, folder="riganest/rooms"):
     f = request.files.get("image")
     if f and f.filename and allowed_file(f.filename):
-        fn = f"{int(datetime.utcnow().timestamp())}_{secure_filename(f.filename)}"
-        f.save(os.path.join(app.config["UPLOAD_FOLDER"], fn))
-        room.image = fn
+        if CLOUDINARY_ENABLED:
+            result = cloudinary.uploader.upload(f, folder=folder)
+            obj.image = result["secure_url"]
+        else:
+            fn = f"{int(datetime.utcnow().timestamp())}_{secure_filename(f.filename)}"
+            f.save(os.path.join(app.config["UPLOAD_FOLDER"], fn))
+            obj.image = fn
 
 
 def upload_extra_photos(room):
-    """Save any number of additional photos for the room slideshow."""
     files = request.files.getlist("photos")
     for i, f in enumerate(files):
         if f and f.filename and allowed_file(f.filename):
-            fn = f"{int(datetime.utcnow().timestamp())}_{i}_{secure_filename(f.filename)}"
-            f.save(os.path.join(app.config["UPLOAD_FOLDER"], fn))
-            db.session.add(RoomImage(room_id=room.id, filename="uploads/" + fn))
+            if CLOUDINARY_ENABLED:
+                result = cloudinary.uploader.upload(f, folder="riganest/rooms")
+                db.session.add(RoomImage(room_id=room.id, filename=result["secure_url"]))
+            else:
+                fn = f"{int(datetime.utcnow().timestamp())}_{i}_{secure_filename(f.filename)}"
+                f.save(os.path.join(app.config["UPLOAD_FOLDER"], fn))
+                db.session.add(RoomImage(room_id=room.id, filename="uploads/" + fn))
 
 
 def upload_attraction_photos(attraction):
-    """Save any number of additional photos for the attraction slideshow."""
     files = request.files.getlist("photos")
     for i, f in enumerate(files):
         if f and f.filename and allowed_file(f.filename):
-            fn = f"{int(datetime.utcnow().timestamp())}_{i}_{secure_filename(f.filename)}"
-            f.save(os.path.join(app.config["UPLOAD_FOLDER"], fn))
-            db.session.add(AttractionImage(attraction_id=attraction.id, filename="uploads/" + fn))
+            if CLOUDINARY_ENABLED:
+                result = cloudinary.uploader.upload(f, folder="riganest/attractions")
+                db.session.add(AttractionImage(attraction_id=attraction.id, filename=result["secure_url"]))
+            else:
+                fn = f"{int(datetime.utcnow().timestamp())}_{i}_{secure_filename(f.filename)}"
+                f.save(os.path.join(app.config["UPLOAD_FOLDER"], fn))
+                db.session.add(AttractionImage(attraction_id=attraction.id, filename="uploads/" + fn))
 
 
 # ----------------------------------------------------------------------
@@ -353,9 +426,7 @@ def upload_attraction_photos(attraction):
 @app.route("/")
 def index():
     rooms = Room.query.filter_by(is_active=True).order_by(Room.rating.desc()).limit(8).all()
-    # Admin-managed hero/banner slides + any room photos on top
     slides = [url_for("static", filename=f"slides/{fn}") for fn in get_banner_images()]
-    slides += [r.image_url() for r in Room.query.filter(Room.image != "").limit(5).all() if r.image_url()]
     gallery = Attraction.query.filter_by(is_active=True).order_by(Attraction.created_at.desc()).limit(8).all()
     today_str = date.today().isoformat()
     tomorrow_str = (date.today() + timedelta(days=1)).isoformat()
@@ -392,8 +463,6 @@ def rooms():
         query = query.filter(Room.capacity >= guests)
     listings = query.order_by(Room.price.asc()).all()
 
-    # Vacancy check: drop any room with a Confirmed/Pending booking that
-    # overlaps the requested check-in/check-out range.
     if check_in and check_out:
         available = []
         for r in listings:
@@ -419,8 +488,6 @@ def room_detail(room_id):
               for b in room.bookings if b.status in ("Confirmed", "Pending")]
     photos = room.photo_urls()
 
-    # Related rooms: prefer the same room type, top up with other
-    # active rooms (highest rated first) if there aren't enough.
     related = Room.query.filter(
         Room.id != room.id,
         Room.is_active.is_(True),
@@ -458,7 +525,8 @@ def attraction_detail(attraction_id):
 
 @app.route("/about")
 def about():
-    return render_template("about.html")
+    about = SiteAbout.query.first()
+    return render_template("about.html", about=about)
 
 
 @app.route("/contact", methods=["GET", "POST"])
@@ -510,11 +578,10 @@ def register():
             u.set_password(pw)
             db.session.add(u)
             db.session.commit()
-            # New account -> verify the email with an OTP before logging in
             session["pending_user"] = u.id
             session["new_registration"] = True
             dev_code = send_otp(u)
-            session["dev_otp"] = dev_code  # only set in dev mode
+            session["dev_otp"] = dev_code
             flash("Account created! Enter the code we emailed you to finish signing in.", "success")
             return redirect(url_for("verify_otp"))
     return render_template("register.html", google_login_enabled=GOOGLE_LOGIN_ENABLED)
@@ -583,8 +650,7 @@ def resend_otp():
 
 
 # ----------------------------------------------------------------------
-# "Continue with Google" sign-in (OAuth) — bypasses the email-OTP step
-# since Google has already verified the user's email address.
+# "Continue with Google" sign-in
 # ----------------------------------------------------------------------
 @app.route("/login/google")
 def google_login():
@@ -615,7 +681,6 @@ def google_callback():
 
     u = User.query.filter_by(email=email).first()
     if u:
-        # Existing account (maybe created via password+OTP) — just link it
         if not u.google_id:
             u.google_id = google_id
             db.session.commit()
@@ -703,7 +768,6 @@ def checkout(booking_id):
             flash(f"Payment error: {e}", "error")
             return redirect(url_for("dashboard"))
 
-    # DEV mode (no Stripe key): show a demo checkout page
     return render_template("checkout_demo.html", booking=bk,
                            publishable_key=STRIPE_PUBLISHABLE_KEY)
 
@@ -789,11 +853,12 @@ def admin_add_room():
             capacity=request.form.get("capacity", 2, type=int),
             beds=request.form.get("beds", 1, type=int),
             size_sqm=request.form.get("size_sqm", 30, type=int),
+            bathrooms=request.form.get("bathrooms", 1, type=int),
             amenities=request.form.get("amenities", "").strip(),
             location=request.form.get("location", "").strip(),
             is_active=bool(request.form.get("is_active")),
         )
-        upload_image(r)
+        upload_image(r, folder="riganest/rooms")
         db.session.add(r)
         db.session.commit()
         upload_extra_photos(r)
@@ -815,10 +880,11 @@ def admin_edit_room(room_id):
         r.capacity = request.form.get("capacity", 2, type=int)
         r.beds = request.form.get("beds", 1, type=int)
         r.size_sqm = request.form.get("size_sqm", 30, type=int)
+        r.bathrooms = request.form.get("bathrooms", 1, type=int)
         r.amenities = request.form.get("amenities", "").strip()
         r.location = request.form.get("location", "").strip()
         r.is_active = bool(request.form.get("is_active"))
-        upload_image(r)
+        upload_image(r, folder="riganest/rooms")
         upload_extra_photos(r)
         db.session.commit()
         flash("Room updated.", "success")
@@ -879,7 +945,7 @@ def _attraction_fields_from_form():
 def admin_add_attraction():
     if request.method == "POST":
         a = Attraction(**_attraction_fields_from_form())
-        upload_image(a)
+        upload_image(a, folder="riganest/attractions")
         db.session.add(a)
         db.session.commit()
         upload_attraction_photos(a)
@@ -896,7 +962,7 @@ def admin_edit_attraction(attraction_id):
     if request.method == "POST":
         for k, v in _attraction_fields_from_form().items():
             setattr(a, k, v)
-        upload_image(a)
+        upload_image(a, folder="riganest/attractions")
         upload_attraction_photos(a)
         db.session.commit()
         flash("Attraction updated.", "success")
@@ -946,6 +1012,129 @@ def admin_users():
                            users=User.query.order_by(User.created_at.desc()).all())
 
 
+
+
+@app.route("/admin/users/<int:user_id>/delete", methods=["POST"])
+@admin_required
+def admin_delete_user(user_id):
+    u = User.query.get_or_404(user_id)
+    if u.is_admin:
+        flash("Cannot delete admin users.", "danger")
+        return redirect(url_for("admin_users"))
+    db.session.delete(u)
+    db.session.commit()
+    flash("User deleted.", "success")
+    return redirect(url_for("admin_users"))
+
+
+
+@app.route("/careers")
+def careers():
+    page = SitePage.query.filter_by(slug="careers").first()
+    return render_template("static_page.html", page=page, slug="careers", default_title="Careers")
+
+@app.route("/press")
+def press():
+    page = SitePage.query.filter_by(slug="press").first()
+    return render_template("static_page.html", page=page, slug="press", default_title="Press")
+
+@app.route("/blog")
+def blog():
+    page = SitePage.query.filter_by(slug="blog").first()
+    return render_template("static_page.html", page=page, slug="blog", default_title="Blog")
+
+@app.route("/help")
+def help_centre():
+    page = SitePage.query.filter_by(slug="help").first()
+    return render_template("static_page.html", page=page, slug="help", default_title="Help Centre")
+
+@app.route("/cancellation-policy")
+def cancellation_policy():
+    page = SitePage.query.filter_by(slug="cancellation-policy").first()
+    return render_template("static_page.html", page=page, slug="cancellation-policy", default_title="Cancellation Policy")
+
+@app.route("/privacy-policy")
+def privacy_policy():
+    page = SitePage.query.filter_by(slug="privacy-policy").first()
+    return render_template("static_page.html", page=page, slug="privacy-policy", default_title="Privacy Policy")
+
+@app.route("/terms-of-service")
+def terms_of_service():
+    page = SitePage.query.filter_by(slug="terms-of-service").first()
+    return render_template("static_page.html", page=page, slug="terms-of-service", default_title="Terms of Service")
+
+@app.route("/safety")
+def safety():
+    page = SitePage.query.filter_by(slug="safety").first()
+    return render_template("static_page.html", page=page, slug="safety", default_title="Safety")
+
+
+@app.route("/admin/pages")
+@admin_required
+def admin_pages():
+    pages_config = [
+        {"slug": "careers", "title": "Careers", "endpoint": "careers"},
+        {"slug": "press", "title": "Press", "endpoint": "press"},
+        {"slug": "blog", "title": "Blog", "endpoint": "blog"},
+        {"slug": "help", "title": "Help Centre", "endpoint": "help_centre"},
+        {"slug": "cancellation-policy", "title": "Cancellation Policy", "endpoint": "cancellation_policy"},
+        {"slug": "privacy-policy", "title": "Privacy Policy", "endpoint": "privacy_policy"},
+        {"slug": "terms-of-service", "title": "Terms of Service", "endpoint": "terms_of_service"},
+        {"slug": "safety", "title": "Safety", "endpoint": "safety"},
+    ]
+    pages = {p.slug: p for p in SitePage.query.all()}
+    return render_template("admin/pages.html", pages_config=pages_config, pages=pages)
+
+@app.route("/admin/pages/<slug>/edit", methods=["GET", "POST"])
+@admin_required
+def admin_edit_page(slug):
+    page = SitePage.query.filter_by(slug=slug).first()
+    if not page:
+        page = SitePage(slug=slug, title=slug.replace("-", " ").title())
+        db.session.add(page)
+        db.session.commit()
+    if request.method == "POST":
+        page.title = request.form.get("title", "").strip()
+        page.content = request.form.get("content", "").strip()
+        img = request.files.get("image")
+        if img and img.filename and allowed_file(img.filename):
+            if CLOUDINARY_ENABLED:
+                result = cloudinary.uploader.upload(img, folder="riganest/pages")
+                page.image = result["secure_url"]
+            else:
+                fn = f"page_{slug}_{int(datetime.utcnow().timestamp())}_{secure_filename(img.filename)}"
+                img.save(os.path.join(app.config["UPLOAD_FOLDER"], fn))
+                page.image = fn
+        page.updated_at = datetime.utcnow()
+        db.session.commit()
+        flash("Page updated.", "success")
+        return redirect(url_for("admin_pages"))
+    return render_template("admin/page_form.html", page=page)
+
+@app.route("/admin/about", methods=["GET", "POST"])
+@admin_required
+def admin_about():
+    about = SiteAbout.query.first()
+    if not about:
+        about = SiteAbout()
+        db.session.add(about)
+        db.session.commit()
+    if request.method == "POST":
+        about.title = request.form.get("title", "About Us").strip()
+        about.hero_subtitle = request.form.get("hero_subtitle", "Our Story").strip()
+        about.content = request.form.get("content", "").strip()
+        about.updated_at = datetime.utcnow()
+        # Handle image upload
+        img = request.files.get("image")
+        if img and img.filename and allowed_file(img.filename):
+            fn = f"about_{int(datetime.utcnow().timestamp())}_{secure_filename(img.filename)}"
+            img.save(os.path.join(app.config["UPLOAD_FOLDER"], fn))
+            about.image = fn
+        db.session.commit()
+        flash("About page updated.", "success")
+        return redirect(url_for("admin_about"))
+    return render_template("admin/about_form.html", about=about)
+
 @app.route("/admin/settings", methods=["GET", "POST"])
 @admin_required
 def admin_settings():
@@ -955,7 +1144,6 @@ def admin_settings():
     if request.method == "POST":
         action = request.form.get("action")
 
-        # ── Upload new logo ──────────────────────────────────────────
         if action == "upload":
             file = request.files.get("logo")
             if not file or file.filename == "":
@@ -965,11 +1153,8 @@ def admin_settings():
                 if ext not in (".png", ".jpg", ".jpeg", ".svg", ".webp"):
                     flash("Allowed formats: PNG, JPG, SVG, WEBP.", "danger")
                 else:
-                    # Always save as logo.png for simplicity;
-                    # for SVG keep original extension
                     save_name = "logo" + ext
                     save_path = os.path.join(BASE_DIR, "static", save_name)
-                    # Remove old logo files
                     for old_ext in (".png", ".jpg", ".jpeg", ".svg", ".webp"):
                         old_file = os.path.join(BASE_DIR, "static", "logo" + old_ext)
                         if os.path.exists(old_file):
@@ -978,7 +1163,6 @@ def admin_settings():
                     flash("✅ Logo uploaded successfully!", "success")
                     return redirect(url_for("admin_settings"))
 
-        # ── Remove logo ──────────────────────────────────────────────
         elif action == "remove":
             for ext in (".png", ".jpg", ".jpeg", ".svg", ".webp"):
                 f = os.path.join(BASE_DIR, "static", "logo" + ext)
@@ -987,7 +1171,6 @@ def admin_settings():
             flash("Logo removed. Site name text will be shown.", "info")
             return redirect(url_for("admin_settings"))
 
-        # ── Upload new banner/slide image(s) ───────────────────────────
         elif action == "upload_banner":
             files = request.files.getlist("banner_images")
             files = [f for f in files if f and f.filename]
@@ -997,7 +1180,6 @@ def admin_settings():
                 saved = 0
                 for f in files:
                     if allowed_file(f.filename):
-                        ext = os.path.splitext(f.filename)[1].lower()
                         fn = f"banner_{int(datetime.utcnow().timestamp()*1000)}_{secure_filename(f.filename)}"
                         f.save(os.path.join(SLIDES_FOLDER, fn))
                         saved += 1
@@ -1007,7 +1189,6 @@ def admin_settings():
                     flash("Allowed formats: PNG, JPG, GIF, WEBP.", "danger")
             return redirect(url_for("admin_settings"))
 
-        # ── Remove a banner/slide image ────────────────────────────────
         elif action == "remove_banner":
             fn = secure_filename(request.form.get("filename", ""))
             f = os.path.join(SLIDES_FOLDER, fn)
@@ -1018,7 +1199,6 @@ def admin_settings():
                 flash("Banner image not found.", "warning")
             return redirect(url_for("admin_settings"))
 
-    # Find current logo filename (any allowed ext)
     current_logo = None
     for ext in (".png", ".jpg", ".jpeg", ".svg", ".webp"):
         if os.path.exists(os.path.join(BASE_DIR, "static", "logo" + ext)):
@@ -1119,7 +1299,6 @@ def seed():
                                "to rest.")
         db.session.add_all([r1, r2, r3, r4, r5, r6])
         db.session.commit()
-        # give each sample room a few photos for the single-page slideshow
         photo_sets = {r1.id: ["g1.jpg", "g3.jpg", "slide1.jpg"],
                       r2.id: ["g2.jpg", "g7.jpg", "slide2.jpg"],
                       r3.id: ["g4.jpg", "g8.jpg", "slide3.jpg"],
@@ -1178,3 +1357,11 @@ if __name__ == "__main__":
     print("  Admin   : admin@riganest.com / admin123")
     print("=" * 60)
     app.run(debug=True)
+@app.route("/debug-cloudinary")
+def debug_cloudinary():
+    return {
+        "CLOUDINARY_CLOUD_NAME": bool(CLOUDINARY_CLOUD_NAME),
+        "CLOUDINARY_API_KEY": bool(CLOUDINARY_API_KEY),
+        "CLOUDINARY_API_SECRET": bool(CLOUDINARY_API_SECRET),
+        "CLOUDINARY_ENABLED": CLOUDINARY_ENABLED,
+    }

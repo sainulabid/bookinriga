@@ -6,10 +6,10 @@
   <div class="page-hero-sm" style="background:linear-gradient(135deg,rgb(0, 74, 170),rgb(26, 115, 232));padding:60px 0;color:#fff">
     <div class="container">
       <div class="breadcrumb" style="color:rgba(255,255,255,0.6);font-size:13px;margin-bottom:10px">
-        <a href="{{ url_for('index') }}" style="color:var(--gold)">Home</a> / Attractions
+        <a href="{{ url_for('index') }}" style="color:var(--gold)">{% if lang=='lv' %}Sākums{% else %}Home{% endif %}</a> / {% if lang=='lv' %}Apskates vietas{% else %}Attractions{% endif %}
       </div>
-      <h1 style="color:#fff;font-size:38px">Attractions</h1>
-      <p style="color:rgba(255,255,255,0.7)">Take a look inside RigaNest — places worth visiting nearby.</p>
+      <h1 style="color:#fff;font-size:38px">{% if lang=='lv' %}Apskates vietas{% else %}Attractions{% endif %}</h1>
+      <p style="color:rgba(255,255,255,0.7)">{% if lang=='lv' %}Ielūkojieties RigaNest apkārtnē — vietas, kuras ir vērts apmeklēt tuvumā.{% else %}Take a look inside RigaNest — places worth visiting nearby.{% endif %}</p>
     </div>
   </div>
 
@@ -32,7 +32,7 @@
         {% endfor %}
       </div>
       {% else %}
-      <div class="empty-state"><h3>No attractions yet</h3><p>Check back soon.</p></div>
+      <div class="empty-state"><h3>{% if lang=='lv' %}Vēl nav pievienota neviena apskates vieta{% else %}No attractions yet{% endif %}</h3><p>{% if lang=='lv' %}Ielūkojieties drīzumā.{% else %}Check back soon.{% endif %}</p></div>
       {% endif %}
     </div>
   </section>

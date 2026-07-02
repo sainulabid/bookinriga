@@ -6,14 +6,20 @@
   <div class="container" style="padding-top:70px;max-width:460px">
     <div style="background:#fff;border:1px solid var(--gray-100);border-radius:var(--radius-lg);padding:40px;box-shadow:var(--shadow-md);text-align:center">
       <div style="font-size:46px;margin-bottom:8px">📧</div>
-      <h1 style="font-size:26px;margin-bottom:8px">Enter verification code</h1>
-      <p style="color:var(--gray-500);margin-bottom:20px">We sent a 6-digit code to your Gmail at {{ email }}.</p>
+      <h1 style="font-size:26px;margin-bottom:8px">{% if lang=='lv' %}Ievadiet verifikācijas kodu{% else %}Enter verification code{% endif %}</h1>
+      <p style="color:var(--gray-500);margin-bottom:20px">{% if lang=='lv' %}Mēs nosūtījām 6 ciparu kodu uz jūsu Gmail adresi {{ email }}.{% else %}We sent a 6-digit code to your Gmail at {{ email }}.{% endif %}</p>
 
       {% if dev_otp %}
       <div class="otp-note">
+        {% if lang=='lv' %}
+        <strong>Izstrādes režīms:</strong> Gmail nav konfigurēts, tāpēc jūsu kods ir
+        <strong style="font-size:16px;letter-spacing:2px">{{ dev_otp }}</strong><br>
+        (arī izdrukāts terminālī)
+        {% else %}
         <strong>Dev mode:</strong> Gmail isn't configured, so your code is
         <strong style="font-size:16px;letter-spacing:2px">{{ dev_otp }}</strong><br>
         (also printed in the terminal)
+        {% endif %}
       </div>
       {% endif %}
 
@@ -22,11 +28,11 @@
         <div class="otp-wrap">
           {% for i in range(6) %}<input class="otp-input" inputmode="numeric" maxlength="1" data-i="{{ i }}">{% endfor %}
         </div>
-        <button class="btn-primary btn-full" type="submit">Verify & Sign In</button>
+        <button class="btn-primary btn-full" type="submit">{% if lang=='lv' %}Verificēt un pieteikties{% else %}Verify & Sign In{% endif %}</button>
       </form>
 
       <p style="margin-top:18px;font-size:14px;color:var(--gray-500)">
-        Didn't get it? <a href="{{ url_for('resend_otp') }}" style="color:var(--primary);font-weight:600">Resend code</a>
+        {% if lang=='lv' %}Nesaņēmāt to? <a href="{{ url_for('resend_otp') }}" style="color:var(--primary);font-weight:600">Sūtīt kodu vēlreiz</a>{% else %}Didn't get it? <a href="{{ url_for('resend_otp') }}" style="color:var(--primary);font-weight:600">Resend code</a>{% endif %}
       </p>
     </div>
   </div>

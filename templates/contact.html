@@ -5,8 +5,8 @@
 <div class="page page-wrap">
   <div class="page-hero-sm" style="background:linear-gradient(135deg,rgb(0, 74, 170),rgb(26, 115, 232));padding:70px 0;color:#fff;text-align:center">
     <div class="container">
-      <p class="section-label" style="color:var(--gold)">Get In Touch</p>
-      <h1 style="color:#fff;font-size:44px">Contact Us</h1>
+      <p class="section-label" style="color:var(--gold)">{% if lang=='lv' %}Sazinieties ar mums{% else %}Get In Touch{% endif %}</p>
+      <h1 style="color:#fff;font-size:44px">{% if lang=='lv' %}Sazinieties ar mums{% else %}Contact Us{% endif %}</h1>
     </div>
   </div>
 
@@ -14,17 +14,22 @@
     <div class="container contact-page-grid" style="max-width:980px;gap:40px;align-items:start">
       <!-- Info -->
       <div>
-        <h2 style="font-size:24px;margin-bottom:18px">We'd love to hear from you</h2>
+        <h2 style="font-size:24px;margin-bottom:18px">{% if lang=='lv' %}Mēs labprāt uzzinātu par jums{% else %}We'd love to hear from you{% endif %}</h2>
         <p style="color:var(--gray-700);line-height:1.8;margin-bottom:26px">
+          {% if lang=='lv' %}
+          Jautājumi par rezervāciju, īpašu pieprasījumu vai kaut ko citu? Nosūtiet mums ziņu, un mūsu komanda
+          drīz sazināsies ar jums.
+          {% else %}
           Questions about a booking, a special request, or anything else? Send us a message and our team
           will get back to you shortly.
+          {% endif %}
         </p>
         <div style="display:flex;flex-direction:column;gap:16px;font-size:15px;color:var(--gray-700)">
           <div>📍 &nbsp; Vecrīga un Rīgas centrs, Latvia</div>
           <div>✉️ &nbsp; hello@riganest.com</div>
           <div>📞 &nbsp; +371 28 458 050</div>
           <div>🌐 &nbsp; <a href="https://www.riganest.com" target="_blank" style="color:var(--primary)">www.riganest.com</a></div>
-          <div>🕐 &nbsp; Support available 24/7</div>
+          <div>🕐 &nbsp; {% if lang=='lv' %}Atbalsts pieejams 24/7{% else %}Support available 24/7{% endif %}</div>
         </div>
       </div>
 
@@ -32,12 +37,12 @@
       <div style="background:#fff;border:1px solid var(--gray-100);border-radius:var(--radius-lg);padding:30px;box-shadow:var(--shadow-sm)">
         <form method="post">
           <div class="form-row">
-            <div class="form-group"><label>Your Name</label><input type="text" name="name" required></div>
-            <div class="form-group"><label>Email</label><input type="email" name="email" required></div>
+            <div class="form-group"><label>{% if lang=='lv' %}Jūsu vārds{% else %}Your Name{% endif %}</label><input type="text" name="name" required></div>
+            <div class="form-group"><label>{% if lang=='lv' %}E-pasts{% else %}Email{% endif %}</label><input type="email" name="email" required></div>
           </div>
-          <div class="form-group"><label>Subject</label><input type="text" name="subject" placeholder="How can we help?"></div>
-          <div class="form-group"><label>Message</label><textarea name="message" rows="5" required></textarea></div>
-          <button type="submit" class="btn-primary btn-full">Send Message</button>
+          <div class="form-group"><label>{% if lang=='lv' %}Temats{% else %}Subject{% endif %}</label><input type="text" name="subject" placeholder="{% if lang=='lv' %}Kā mēs varam palīdzēt?{% else %}How can we help?{% endif %}"></div>
+          <div class="form-group"><label>{% if lang=='lv' %}Ziņojums{% else %}Message{% endif %}</label><textarea name="message" rows="5" required></textarea></div>
+          <button type="submit" class="btn-primary btn-full">{% if lang=='lv' %}Nosūtīt ziņu{% else %}Send Message{% endif %}</button>
         </form>
       </div>
     </div>

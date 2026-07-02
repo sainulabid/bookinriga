@@ -1,0 +1,52 @@
+{% extends "base.html" %}
+{% block title %}Edit About Page — RigaNest{% endblock %}
+
+{% block content %}
+<div class="page page-wrap">
+  <div class="container admin-shell" style="max-width:800px">
+    <h1 style="font-size:32px">About Page</h1>
+    <div class="admin-tabs">
+      <a href="{{ url_for('admin_dashboard') }}">Overview</a>
+      <a href="{{ url_for('admin_rooms') }}">Rooms</a>
+      <a href="{{ url_for('admin_attractions') }}">Attractions</a>
+      <a href="{{ url_for('admin_bookings') }}">Bookings</a>
+      <a href="{{ url_for('admin_users') }}">Users</a>
+      <a href="{{ url_for('admin_messages') }}">Messages</a>
+      <a href="{{ url_for('admin_about') }}" class="active">About</a>
+      <a href="{{ url_for('admin_settings') }}">Settings</a>
+    </div>
+
+    {% with messages = get_flashed_messages(with_categories=true) %}
+      {% for cat, msg in messages %}
+        <div style="background:{% if cat=='success' %}#d4edda{% else %}#f8d7da{% endif %};padding:12px 16px;border-radius:8px;margin-bottom:16px;font-size:14px">{{ msg }}</div>
+      {% endfor %}
+    {% endwith %}
+
+    <form method="post" enctype="multipart/form-data" style="background:#fff;border:1px solid var(--gray-100);border-radius:var(--radius-lg);padding:30px;box-shadow:var(--shadow-sm)">
+      <div class="form-group">
+        <label>Page Title</label>
+        <input type="text" name="title" value="{{ about.title if about else 'About Us' }}" placeholder="About Us">
+      </div>
+      <div class="form-group">
+        <label>Hero Subtitle (small text above title)</label>
+        <input type="text" name="hero_subtitle" value="{{ about.hero_subtitle if about else 'Our Story' }}" placeholder="Our Story">
+      </div>
+      <div class="form-group">
+        <label>Photo (left side)</label>
+        <input type="file" name="image" accept="image/*">
+        {% if about and about.image_url() %}
+        <img src="{{ about.image_url() }}" style="margin-top:12px;height:120px;border-radius:var(--radius);object-fit:cover">
+        <p style="font-size:12px;color:var(--gray-400);margin-top:4px">Current photo — upload new to replace</p>
+        {% endif %}
+      </div>
+      <div class="form-group">
+        <label>Content (right side)</label>
+        <textarea name="content" style="min-height:280px;font-size:14px;line-height:1.7">{{ about.content if about else '' }}</textarea>
+        <p style="font-size:12px;color:var(--gray-400);margin-top:6px">Each line break = new paragraph.</p>
+      </div>
+      <button type="submit" class="btn-primary">Save Changes</button>
+      <a href="{{ url_for('about') }}" target="_blank" style="margin-left:16px;color:var(--primary);font-size:14px;font-weight:600">Preview →</a>
+    </form>
+  </div>
+</div>
+{% endblock %}

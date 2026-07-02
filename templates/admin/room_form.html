@@ -8,15 +8,16 @@
     <h1 style="font-size:30px;margin:14px 0 24px">{{ 'Edit room' if room else 'Add a room' }}</h1>
 
     <form method="post" enctype="multipart/form-data" style="background:#fff;border:1px solid var(--gray-100);border-radius:var(--radius-lg);padding:30px;box-shadow:var(--shadow-sm)">
-      <div class="form-group"><label>Room name</label><input type="text" name="name" required value="{{ room.name if room else '' }}"></div>
+      <div class="form-group"><label>Room name *</label><input type="text" name="name" required value="{{ room.name if room else '' }}"></div>
       <div class="form-row">
-        <div class="form-group"><label>Type</label><input type="text" name="room_type" placeholder="Suite, Deluxe…" required value="{{ room.room_type if room else '' }}"></div>
-        <div class="form-group"><label>Price / night (€)</label><input type="number" step="0.01" name="price" required value="{{ room.price if room else '' }}"></div>
+        <div class="form-group"><label>Type</label><input type="text" name="room_type" placeholder="Suite, Deluxe…" value="{{ room.room_type if room else '' }}"></div>
+        <div class="form-group"><label>Price / night (€) *</label><input type="number" step="0.01" name="price" required value="{{ room.price if room else '' }}"></div>
       </div>
-      <div class="form-row-3">
+      <div class="form-row-3" style="display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:14px">
         <div class="form-group"><label>Max guests</label><input type="number" name="capacity" value="{{ room.capacity if room else 2 }}"></div>
         <div class="form-group"><label>Beds</label><input type="number" name="beds" value="{{ room.beds if room else 1 }}"></div>
-        <div class="form-group"><label>Size (m²)</label><input type="number" name="size_sqm" value="{{ room.size_sqm if room else 30 }}"></div>
+        <div class="form-group"><label>Bathrooms *</label><input type="number" name="bathrooms" required min="1" value="{{ room.bathrooms if room else 1 }}"></div>
+        <div class="form-group"><label>Size (m²)</label><input type="number" name="size_sqm" min="1" value="{{ room.size_sqm if room else 30 }}"></div>
       </div>
       <div class="form-group"><label>Amenities (comma separated)</label><input type="text" name="amenities" placeholder="Sea View, WiFi, Breakfast" value="{{ room.amenities if room else '' }}"></div>
       <div class="form-group"><label>Location (for the map)</label><input type="text" name="location" placeholder="Riga Old Town, Latvia" value="{{ room.location if room else '' }}"></div>
@@ -31,6 +32,7 @@
       <div class="form-group">
         <label>Extra photos for the slideshow (select several)</label>
         <input type="file" name="photos" accept="image/*" multiple>
+        <p style="font-size:12px;color:var(--gray-500);margin-top:6px">You can select multiple photos at once. They will appear in the slideshow on the room page.</p>
       </div>
 
       <label class="filter-check" style="display:flex;align-items:center;gap:10px;margin-bottom:20px;font-size:14px">
@@ -44,13 +46,25 @@
     <div style="display:flex;gap:14px;flex-wrap:wrap">
       {% for p in room.photos %}
       <div style="position:relative">
-        <img src="{{ url_for('static', filename=p.filename) }}" style="height:90px;width:130px;object-fit:cover;border-radius:8px">
+        <img src="{{ url_for('static', filename=p.filename) if not p.filename.startswith('http') else p.filename }}"
+             style="height:90px;width:130px;object-fit:cover;border-radius:8px"
+             onerror="this.style.background='#eee';this.style.display='flex'">
         <form method="post" action="{{ url_for('admin_delete_photo', photo_id=p.id) }}" style="position:absolute;top:4px;right:4px">
           <button title="Remove" style="background:rgba(192,57,43,.92);color:#fff;border:none;width:24px;height:24px;border-radius:50%;cursor:pointer;font-weight:700">×</button>
         </form>
       </div>
       {% endfor %}
     </div>
+    {% elif room %}
+    <div style="margin-top:24px;padding:18px;background:#f9f9f9;border-radius:8px;color:var(--gray-500);font-size:14px">
+      No slideshow photos added yet. Use "Extra photos" above to add some.
+    </div>
+    {% endif %}
+
+    {% if room and room.location %}
+    <h3 style="margin:30px 0 10px;font-size:20px">Location Preview</h3>
+    <iframe style="width:100%;height:280px;border:none;border-radius:10px" loading="lazy"
+      src="https://maps.google.com/maps?q={{ room.location|urlencode }}&output=embed"></iframe>
     {% endif %}
   </div>
 </div>

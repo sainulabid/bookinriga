@@ -1,0 +1,48 @@
+{% extends "base.html" %}
+{% block title %}{{ page.title if page else default_title }} — RigaNest{% endblock %}
+
+{% block content %}
+<div class="page page-wrap">
+  <div class="page-hero-sm" style="background:linear-gradient(135deg,rgb(0,74,170),rgb(26,115,232));padding:60px 0;color:#fff;text-align:center">
+    <div class="container">
+      <h1 style="color:#fff;font-size:40px;margin:0">{{ page.title if page else default_title }}</h1>
+    </div>
+  </div>
+  <section>
+    <div class="container" style="max-width:1000px;padding-top:50px;padding-bottom:60px">
+      {% if page and page.content %}
+
+      <!-- LEFT photo + RIGHT content layout -->
+      <div style="display:grid;grid-template-columns:1fr 1.1fr;gap:48px;align-items:start">
+
+        <!-- LEFT: Photo -->
+        <div>
+          {% if page.image_url() %}
+          <img src="{{ page.image_url() }}" alt="{{ page.title }}"
+               style="width:100%;height:420px;object-fit:cover;border-radius:var(--radius-lg);box-shadow:var(--shadow-md)">
+          {% else %}
+          <div style="width:100%;height:420px;background:linear-gradient(135deg,#e8f0fe,#c5d5f5);border-radius:var(--radius-lg);display:flex;align-items:center;justify-content:center;font-size:60px">📄</div>
+          {% endif %}
+        </div>
+
+        <!-- RIGHT: Content -->
+        <div>
+          {% for paragraph in page.content.split('\n') %}
+            {% if paragraph.strip() %}
+            <p style="font-size:16px;color:var(--gray-700);line-height:1.9;margin-bottom:16px">{{ paragraph.strip() }}</p>
+            {% endif %}
+          {% endfor %}
+        </div>
+
+      </div>
+
+      {% else %}
+      <div style="text-align:center;padding:60px 0;color:var(--gray-400)">
+        <div style="font-size:48px;margin-bottom:16px">📄</div>
+        <p style="font-size:16px">{% if lang=='lv' %}Šai lapai vēl nav satura. <a href="{{ url_for('admin_pages') }}" style="color:var(--primary)">Pievienot saturu admin panelī →</a>{% else %}This page has no content yet. <a href="{{ url_for('admin_pages') }}" style="color:var(--primary)">Add content in admin →</a>{% endif %}</p>
+      </div>
+      {% endif %}
+    </div>
+  </section>
+</div>
+{% endblock %}

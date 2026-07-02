@@ -12,11 +12,13 @@
       <a href="{{ url_for('admin_bookings') }}">Bookings</a>
       <a href="{{ url_for('admin_users') }}" class="active">Users</a>
       <a href="{{ url_for('admin_messages') }}">Messages</a>
+      <a href="{{ url_for('admin_about') }}">About</a>
+      <a href="{{ url_for('admin_pages') }}">Pages</a>
       <a href="{{ url_for('admin_settings') }}">Settings</a>
     </div>
 
     <table class="admin-table">
-      <thead><tr><th>#</th><th>Name</th><th>Email</th><th>Phone</th><th>Role</th><th>Joined</th></tr></thead>
+      <thead><tr><th>#</th><th>Name</th><th>Email</th><th>Phone</th><th>Role</th><th>Joined</th><th>Action</th></tr></thead>
       <tbody>
         {% for u in users %}
         <tr>
@@ -26,6 +28,18 @@
           <td>{{ u.phone }}</td>
           <td>{% if u.is_admin %}<span class="badge badge-blue">Admin</span>{% else %}<span class="badge">Guest</span>{% endif %}</td>
           <td>{{ u.created_at.strftime('%d %b %Y') }}</td>
+          <td>
+            {% if not u.is_admin %}
+            <form method="post" action="{{ url_for('admin_delete_user', user_id=u.id) }}"
+                  onsubmit="return confirm('Delete user {{ u.name }}? This cannot be undone.')">
+              <button type="submit" style="background:#e74c3c;color:#fff;border:none;padding:5px 12px;border-radius:6px;font-size:13px;cursor:pointer;font-weight:600">
+                Delete
+              </button>
+            </form>
+            {% else %}
+            <span style="color:var(--gray-400);font-size:13px">Protected</span>
+            {% endif %}
+          </td>
         </tr>
         {% endfor %}
       </tbody>

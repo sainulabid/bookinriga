@@ -8,8 +8,8 @@
 <div class="page page-wrap">
   <div class="container" style="padding-top:40px">
     <div class="breadcrumb" style="font-size:13px;color:var(--gray-500);margin-bottom:20px">
-      <a href="{{ url_for('index') }}" style="color:var(--primary)">Home</a> /
-      <a href="{{ url_for('rooms') }}" style="color:var(--primary)">Rooms</a> / {{ room.name }}
+      <a href="{{ url_for('index') }}" style="color:var(--primary)">{% if lang=='lv' %}Sākums{% else %}Home{% endif %}</a> /
+      <a href="{{ url_for('rooms') }}" style="color:var(--primary)">{% if lang=='lv' %}Istabas{% else %}Rooms{% endif %}</a> / {{ room.name }}
     </div>
 
     <div class="room-detail-grid" style="align-items:start">
@@ -40,8 +40,9 @@
           <span class="badge badge-gold">{{ room.room_type }}</span>
           <h1 style="font-size:34px;margin:14px 0 8px">{{ room.name }}</h1>
           <div class="room-meta" style="font-size:14px;color:var(--gray-500);gap:20px">
-            <span>👤 {{ room.capacity }} guests</span>
-            <span>🛏️ {{ room.beds }} bed{{ 's' if room.beds > 1 }}</span>
+            <span>👤 {{ room.capacity }} {% if lang=='lv' %}viesi{% else %}guests{% endif %}</span>
+            <span>🛏️ {{ room.beds }} {% if lang=='lv' %}gult{{ 'as' if room.beds > 1 else 'a' }}{% else %}bed{{ 's' if room.beds > 1 }}{% endif %}</span>
+            <span>🚿 {{ room.bathrooms if room.bathrooms else 1 }} {% if lang=='lv' %}vannas ist.{% else %}bathroom{{ 's' if (room.bathrooms and room.bathrooms > 1) }}{% endif %}</span>
             <span>📐 {{ room.size_sqm }}m²</span>
             <span style="color:var(--gold)">★ {{ '%.1f'|format(room.rating) }}</span>
           </div>
@@ -50,7 +51,7 @@
 
         <!-- AVAILABILITY CALENDAR -->
         <div class="avail-cal">
-          <div class="avail-cal-heading">📅 Availability</div>
+          <div class="avail-cal-heading">📅 {% if lang=='lv' %}Pieejamība{% else %}Availability{% endif %}</div>
           <div class="avail-cal-head">
             <button type="button" class="avail-cal-nav" id="calPrev" aria-label="Previous month">‹</button>
             <div class="avail-cal-title" id="calTitle"></div>
@@ -58,82 +59,189 @@
           </div>
           <div class="avail-cal-grid" id="calGrid"></div>
           <div class="avail-cal-legend">
-            <span class="avail-cal-legend-item"><span class="avail-cal-dot available"></span> Available</span>
-            <span class="avail-cal-legend-item"><span class="avail-cal-dot booked"></span> Booked</span>
-            <span class="avail-cal-legend-item"><span class="avail-cal-dot past"></span> Past</span>
+            <span class="avail-cal-legend-item"><span class="avail-cal-dot available"></span> {% if lang=='lv' %}Pieejams{% else %}Available{% endif %}</span>
+            <span class="avail-cal-legend-item"><span class="avail-cal-dot booked"></span> {% if lang=='lv' %}Rezervēts{% else %}Booked{% endif %}</span>
+            <span class="avail-cal-legend-item"><span class="avail-cal-dot past"></span> {% if lang=='lv' %}Pagājis{% else %}Past{% endif %}</span>
           </div>
         </div>
 
         <!-- TABS -->
         <div class="tabs">
           <div class="tab-btns">
-            <button class="tab-btn active" data-tab="amenities">Amenities</button>
-            <button class="tab-btn" data-tab="internet">Internet</button>
-            <button class="tab-btn" data-tab="kitchen">Kitchen</button>
-            <button class="tab-btn" data-tab="suitability">Suitability</button>
+            <button class="tab-btn active" data-tab="amenities">{% if lang=='lv' %}Ērtības{% else %}Amenities{% endif %}</button>
+            <button class="tab-btn" data-tab="internet">{% if lang=='lv' %}Internets{% else %}Internet{% endif %}</button>
+            <button class="tab-btn" data-tab="kitchen">{% if lang=='lv' %}Virtuve{% else %}Kitchen{% endif %}</button>
+            <button class="tab-btn" data-tab="suitability">{% if lang=='lv' %}Piemērotība{% else %}Suitability{% endif %}</button>
           </div>
           <div class="tab-panel active" data-panel="amenities">
             {% for a in room.amenity_list() %}<span class="tab-chip">✓ {{ a }}</span>{% endfor %}
-            <span class="tab-chip">✓ Air conditioning</span>
-            <span class="tab-chip">✓ Daily housekeeping</span>
-            <span class="tab-chip">✓ 24/7 reception</span>
+            <span class="tab-chip">✓ {% if lang=='lv' %}Gaisa kondicionieris{% else %}Air conditioning{% endif %}</span>
+            <span class="tab-chip">✓ {% if lang=='lv' %}Ikdienas uzkopšana{% else %}Daily housekeeping{% endif %}</span>
+            <span class="tab-chip">✓ {% if lang=='lv' %}Reģistratūra 24/7{% else %}24/7 reception{% endif %}</span>
           </div>
           <div class="tab-panel" data-panel="internet">
-            <span class="tab-chip">✓ Free high-speed WiFi</span>
-            <span class="tab-chip">✓ Wired internet</span>
-            <span class="tab-chip">✓ Smart TV with streaming</span>
+            <span class="tab-chip">✓ {% if lang=='lv' %}Bezmaksas ātrgaitas WiFi{% else %}Free high-speed WiFi{% endif %}</span>
+            <span class="tab-chip">✓ {% if lang=='lv' %}Vadu internets{% else %}Wired internet{% endif %}</span>
+            <span class="tab-chip">✓ {% if lang=='lv' %}Viedā TV ar straumēšanu{% else %}Smart TV with streaming{% endif %}</span>
           </div>
           <div class="tab-panel" data-panel="kitchen">
-            <span class="tab-chip">✓ Kettle & coffee maker</span>
-            <span class="tab-chip">✓ Minibar</span>
-            <span class="tab-chip">✓ Complimentary water</span>
-            <span class="tab-chip">✓ Breakfast available</span>
+            <span class="tab-chip">✓ {% if lang=='lv' %}Tējkanna un kafijas automāts{% else %}Kettle & coffee maker{% endif %}</span>
+            <span class="tab-chip">✓ {% if lang=='lv' %}Minibārs{% else %}Minibar{% endif %}</span>
+            <span class="tab-chip">✓ {% if lang=='lv' %}Bezmaksas ūdens{% else %}Complimentary water{% endif %}</span>
+            <span class="tab-chip">✓ {% if lang=='lv' %}Pieejamas brokastis{% else %}Breakfast available{% endif %}</span>
           </div>
           <div class="tab-panel" data-panel="suitability">
-            <span class="tab-chip">✓ Non-smoking</span>
-            <span class="tab-chip">✓ Families welcome</span>
-            <span class="tab-chip">✗ Pets not allowed</span>
-            <span class="tab-chip">✗ Parties not allowed</span>
+            <span class="tab-chip">✓ {% if lang=='lv' %}Nesmēķētāju telpa{% else %}Non-smoking{% endif %}</span>
+            <span class="tab-chip">✓ {% if lang=='lv' %}Ģimenes gaidītas{% else %}Families welcome{% endif %}</span>
+            <span class="tab-chip">✗ {% if lang=='lv' %}Mājdzīvnieki nav atļauti{% else %}Pets not allowed{% endif %}</span>
+            <span class="tab-chip">✗ {% if lang=='lv' %}Ballītes nav atļautas{% else %}Parties not allowed{% endif %}</span>
           </div>
         </div>
 
         <!-- TERMS ACCORDION -->
-        <h3 style="margin:34px 0 6px;font-size:22px">Terms</h3>
+        <h3 style="margin:34px 0 6px;font-size:22px">{% if lang=='lv' %}Noteikumi{% else %}Terms{% endif %}</h3>
         <div class="accordion">
+
+          <!-- GENERAL TERMS -->
           <div class="acc-item">
-            <div class="acc-head" onclick="toggleAcc(this)"><span class="pm">+</span> General terms</div>
+            <div class="acc-head" onclick="toggleAcc(this)"><span class="pm">+</span> {% if lang=='lv' %}Vispārīgie noteikumi{% else %}General terms{% endif %}</div>
             <div class="acc-body">
-              Check-in is from 2:00 PM and check-out is until 11:00 AM. A valid ID and the
-              card used for booking are required at arrival. Quiet hours are between 10:00 PM and 8:00 AM.
+              {% if lang=='lv' %}
+              <div class="terms-intro">Lietošanas noteikumi un iekšējās kārtības noteikumi apartamentā</div>
+              <ol class="terms-list">
+                <li>Īres maksā ir iekļauti pamata komunālie pakalpojumi — ūdens, elektrība, atkritumu izvešana, kā arī satelīta TV, internets un drošības signalizācija (ja pieejama).</li>
+                <li>Visu iekārtu (trauku mazgājamā mašīna, veļas mašīna, gludeklis, fēns u.c.) un inventāra (pannas, katli, trauki, gultas veļa, dvieļi u.c.) lietošana ir iekļauta īres maksā.</li>
+                <li>Ja maksājums netiek ieskaitīts Iznomātāja bankas kontā 5 darba dienu laikā, rezervācija tiks automātiski atcelta bez atsevišķa paziņojuma.</li>
+                <li>Iznomātājs nav atbildīgs par nelaimes gadījumiem, bojājumiem, zaudējumiem vai neērtībām, ko Īrnieks vai trešās personas radījušas īres perioda laikā.</li>
+                <li>Īrniekam jārūpējas par visām telpām, iekārtām un interjera priekšmetiem. Jebkurš bojājums nekavējoties jākompensē pilnā apmērā.</li>
+                <li>Ja izbraukšanas brīdī apartaments ir netīrs, Īrniekam jāmaksā tīrīšanas sods, sākot no €50, atkarībā no apartamenta stāvokļa.</li>
+                <li>Iznomātājs var nekavējoties izbeigt līgumu bez brīdinājuma, ja Īrnieks pārkāpj sociālās uzvedības normas (agresīva vai amorāla rīcība).</li>
+                <li>Iznomātājs nekavējoties reaģēs uz jebkuru ziņoto bojājumu un pēc iespējas ātrāk to novērsīs.</li>
+                <li>Iznomātājs var atteikt izīrēt jebkurai personai, kas tiek uzskatīta par nespējīgu uzņemties atbildību par apartamentu.</li>
+                <li>Viesu skaits nedrīkst pārsniegt rezervācijā norādīto skaitu. Pārkāpuma gadījumā Iznomātājs var nekavējoties atcelt līgumu.</li>
+                <li>Bērni vienmēr jāuzrauga pieaugušajam, īpaši uz kāpnēm, balkoniem un kopīgās telpās. Zīmēšana apartamentā var radīt tīrīšanas maksu.</li>
+                <li>Bojāti dvieļi vai gultas veļa (kafijas, vīna, šokolādes, lūpu krāsas, tintes u.c. traipi) tiks apmaksāti to nomaiņas vērtībā.</li>
+                <li>Iznomātājs un darbinieki var apmeklēt apartamentu jebkurā saprātīgā laikā pārbaudei, remontam vai tīrīšanai.</li>
+                <li>Apartamentu nedrīkst izmantot ārpus rezervācijas perioda.</li>
+                <li>Īrnieks ir atbildīgs par jebkuriem bojājumiem, ko radījušas trešās personas, kurām viņš atļāvis ieiet apartamentā.</li>
+                <li>Mēbeļu vai interjera priekšmetu pārvietošana vai izņemšana no apartamenta nav atļauta.</li>
+                <li>Smēķēšana ir stingri aizliegta. Par smēķēšanu telpās tiks piemērots sods €150 par istabu.</li>
+                <li>Aizliegts traucēt kaimiņus ar skaļu mūziku vai nepiemērotu uzvedību pēc plkst. 23:00.</li>
+                <li>Īrniekam jāuztur apartaments labā kārtībā un jāievēro ugunsdrošības un elektrības lietošanas noteikumi.</li>
+                <li>Apartamenta inventāra bojājumi radīs maksu proporcionāli bojājuma apmēram.</li>
+                <li>Pēc apmaksas Īrnieks saņem apartamenta atslēgas un autostāvvietas karti (ja pieejama). Atslēgas nedrīkst nodot trešajām personām. Atslēgu nozaudēšanas gadījumā jāapmaksā pilna slēdzenes nomaiņa un 5 jaunas atslēgas.</li>
+                <li>Īrniekam jāatbrīvo apartaments līgumā noteiktajā laikā.</li>
+                <li>Apartamentā nav atļauti mājdzīvnieki.</li>
+                <li>Izejot, iemītniekiem jāizslēdz gaisma un elektroierīces, jāaizver ūdens krāni, jāaizver logi un jāaizslēdz durvis.</li>
+                <li>Iznomātājs nav atbildīgs par Īrnieka personiskajām mantām, kas atstātas apartamentā.</li>
+                <li>Šis līgums stājas spēkā ar parakstīšanu un paliek spēkā, līdz visas saistības ir izpildītas.</li>
+                <li>Visi strīdi tiek risināti sarunu ceļā. Ja tie netiek atrisināti, tos nodod Latvijas Republikas tiesām.</li>
+                <li>Šis līgums ir saistošs abu pušu mantiniekiem un tiesību pārņēmējiem.</li>
+                <li>Veicot rezervāciju, Īrnieks apstiprina, ka ir izlasījis, sapratis un pilnībā piekritis šim līgumam.</li>
+                <li>Video novērošana ir pieejama tikai viesnīcas vestibilos un koridoros — nevis apartamentu iekšienē. Īrnieki par to tiek informēti ar atbilstošām brīdinājuma zīmēm.</li>
+              </ol>
+              {% else %}
+              <div class="terms-intro">Terms of use and internal regulations in the apartment</div>
+              <ol class="terms-list">
+                <li>The rent includes basic utilities — water, electricity, garbage collection, as well as satellite TV, Internet, and security alarm (if available).</li>
+                <li>Use of all equipment (dishwasher, washing machine, iron, hair dryer, etc.) and inventory (pans, pots, dishes, bed linen, towels, etc.) is included in the rent.</li>
+                <li>If the payment is not credited to the Lender's bank account within 5 working days, the reservation will be automatically cancelled without a separate notice.</li>
+                <li>The Lender is not responsible for accidents, damages, losses, or inconveniences caused by the Tenant or third parties during the rental period.</li>
+                <li>The Tenant must take care of all premises, appliances and interior items. Any damage must be compensated in full immediately.</li>
+                <li>If the apartment is found dirty at departure, the Tenant must pay a cleaning fine starting from €50, depending on the condition of the apartment.</li>
+                <li>The Lender may immediately terminate the agreement without notice if the Tenant violates social behaviour norms (aggressive or amoral behaviour).</li>
+                <li>The Lender will respond promptly to any reported damages and repair them as soon as possible.</li>
+                <li>The Lender may refuse to rent to any person deemed unable to take responsibility for the apartment.</li>
+                <li>The number of guests may not exceed the number specified during reservation. Violation allows the Lender to immediately cancel the agreement.</li>
+                <li>Children must always be supervised by an adult, especially on stairs, balconies and common areas. Drawing in the apartment may result in a cleaning charge.</li>
+                <li>Damaged towels or bed linen (stains from coffee, wine, chocolate, lipstick, ink, etc.) will be charged at their replacement value.</li>
+                <li>The Lender and employees may visit the apartment at any reasonable time for inspection, repairs, or cleaning.</li>
+                <li>The apartment may not be used outside the reservation period.</li>
+                <li>The Tenant is responsible for any damages caused by third parties they have allowed into the apartment.</li>
+                <li>Moving or removing furniture or interior items from the apartment is not permitted.</li>
+                <li>Smoking is strictly prohibited. A fine of €150 per room will be charged for smoking inside the premises.</li>
+                <li>Disturbing neighbours with loud music or inappropriate behaviour after 23:00 is forbidden.</li>
+                <li>The Tenant must maintain the apartment in good order and comply with fire safety and electrical usage rules.</li>
+                <li>Damage to apartment inventory will result in charges proportional to the extent of the damage.</li>
+                <li>After payment, the Tenant receives apartment keys and a parking card (if available). Keys must not be transferred to third parties. Loss of keys requires full lock replacement and 5 new keys at the Tenant's expense.</li>
+                <li>The Tenant must vacate the apartment within the time specified in the agreement.</li>
+                <li>No pets are allowed in the apartment.</li>
+                <li>Upon leaving, residents must turn off lights and electrical equipment, close water taps, close windows, and lock doors.</li>
+                <li>The Lender is not responsible for the Tenant's personal belongings left in the apartment.</li>
+                <li>This agreement comes into force upon signing and remains valid until all obligations are fulfilled.</li>
+                <li>All disputes are resolved through negotiation. If unresolved, they are referred to the courts of the Republic of Latvia.</li>
+                <li>This agreement is binding on the heirs and successors of both parties.</li>
+                <li>By making a reservation, the Tenant confirms they have read, understood, and fully agreed to this agreement.</li>
+                <li>Video surveillance is available in hotel lobbies and corridors only — not inside apartments. Tenants are informed via appropriate warning signs.</li>
+              </ol>
+              {% endif %}
             </div>
           </div>
+
+          <!-- RULES -->
           <div class="acc-item">
-            <div class="acc-head" onclick="toggleAcc(this)"><span class="pm">+</span> Rules</div>
+            <div class="acc-head" onclick="toggleAcc(this)"><span class="pm">+</span> {% if lang=='lv' %}Noteikumi{% else %}Rules{% endif %}</div>
             <div class="acc-body">
-              <ul>
-                <li>No smoking inside the room.</li>
-                <li>Maximum occupancy is {{ room.capacity }} guests.</li>
-                <li>Pets are not allowed.</li>
-                <li>Please respect quiet hours and other guests.</li>
-              </ul>
             </div>
           </div>
+
+          <!-- CANCELLATION -->
           <div class="acc-item">
-            <div class="acc-head" onclick="toggleAcc(this)"><span class="pm">+</span> Cancellation</div>
+            <div class="acc-head" onclick="toggleAcc(this)"><span class="pm">+</span> {% if lang=='lv' %}Atcelšana{% else %}Cancellation{% endif %}</div>
             <div class="acc-body">
-              <ul>
-                <li>Cancel more than 7 days before check-in: full refund.</li>
-                <li>Cancel less than 7 days before check-in: prepayment is non-refundable.</li>
-                <li>Early departure: remaining nights are non-refundable.</li>
-                <li>No-show: the full amount is charged and is non-refundable.</li>
-              </ul>
+              <p style="margin-bottom:16px;color:var(--gray-700);font-size:14px;line-height:1.7">{% if lang=='lv' %}Mūsu atcelšanas politika ietver šādus nosacījumus:{% else %}Our cancellation policy includes the following conditions:{% endif %}</p>
+              <div class="cancel-timeline">
+                <div class="cancel-step cancel-green">
+                  <div class="cancel-dot"></div>
+                  <div class="cancel-content">
+                    <strong>{% if lang=='lv' %}7+ dienas pirms reģistrēšanās{% else %}7+ Days Before Check-in{% endif %}</strong>
+                    <p>{% if lang=='lv' %}Pilna atmaksa — visa rezervācijas summa tiks atmaksāta.{% else %}Full refund — the total amount of the reservation will be refunded.{% endif %}</p>
+                  </div>
+                </div>
+                <div class="cancel-step cancel-red">
+                  <div class="cancel-dot"></div>
+                  <div class="cancel-content">
+                    <strong>{% if lang=='lv' %}Mazāk par 7 dienām pirms reģistrēšanās{% else %}Less Than 7 Days Before Check-in{% endif %}</strong>
+                    <p>{% if lang=='lv' %}100% priekšapmaksa netiek atmaksāta.{% else %}The 100% prepayment is non-refundable.{% endif %}</p>
+                  </div>
+                </div>
+                <div class="cancel-step cancel-red">
+                  <div class="cancel-dot"></div>
+                  <div class="cancel-content">
+                    <strong>{% if lang=='lv' %}Priekšlaicīga izbraukšana{% else %}Early Departure{% endif %}</strong>
+                    <p>{% if lang=='lv' %}Ja viesis ierodas un nolemj izbraukt agrāk, atcelšanas izmaksas 100% apmērā netiek atmaksātas.{% else %}If the guest arrives and decides to leave early, the cancellation costs are 100% non-refunded.{% endif %}</p>
+                  </div>
+                </div>
+                <div class="cancel-step cancel-red">
+                  <div class="cancel-dot"></div>
+                  <div class="cancel-content">
+                    <strong>{% if lang=='lv' %}Neierašanās{% else %}No-Show{% endif %}</strong>
+                    <p>{% if lang=='lv' %}Tiks iekasēta pilna rezervācijas cena, un tā netiek atmaksāta.{% else %}The total price of the reservation will be charged and is non-refundable.{% endif %}</p>
+                  </div>
+                </div>
+              </div>
+              <div class="cancel-notice">
+                <span class="cancel-notice-icon">✉️</span>
+                <div>
+                  <strong>{% if lang=='lv' %}Kā atcelt{% else %}How to Cancel{% endif %}</strong>
+                  {% if lang=='lv' %}
+                  <p>Ir tikai viens derīgs veids, kā atcelt: nosūtiet atcelšanas pieprasījumu ar savu <em>rezervācijas numuru</em> uz e-pastu <a href="mailto:reservations@homestate.lv" style="color:var(--primary);font-weight:600">reservations@homestate.lv</a></p>
+                  <p style="margin-top:6px">Visas atcelšanas tiek apstiprinātas pa e-pastu tūlīt pēc rezervācijas atcelšanas.</p>
+                  {% else %}
+                  <p>There is only one valid way to cancel: send a cancellation request with your <em>reservation number</em> via email to <a href="mailto:reservations@homestate.lv" style="color:var(--primary);font-weight:600">reservations@homestate.lv</a></p>
+                  <p style="margin-top:6px">All cancellations are confirmed via email immediately after the reservation has been cancelled.</p>
+                  {% endif %}
+                </div>
+              </div>
             </div>
           </div>
+
         </div>
+        <!-- END TERMS ACCORDION -->
 
         <!-- LOCATION MAP -->
         {% if room.location %}
-        <h3 style="margin:34px 0 6px;font-size:22px">Location</h3>
+        <h3 style="margin:34px 0 6px;font-size:22px">{% if lang=='lv' %}Atrašanās vieta{% else %}Location{% endif %}</h3>
         <p style="color:var(--gray-500);font-size:14px">📍 {{ room.location }}</p>
         <iframe class="map-frame" loading="lazy"
           src="https://maps.google.com/maps?q={{ room.location|urlencode }}&output=embed"></iframe>
@@ -143,33 +251,33 @@
       <!-- RIGHT SIDEBAR: BOOK BOX + RELATED ROOMS -->
       <div style="position:sticky;top:90px">
         <div class="summary-card" style="background:#fff;border:1px solid var(--gray-100);border-radius:var(--radius-lg);padding:28px;box-shadow:var(--shadow-md)">
-          <div class="room-price" style="font-size:32px">€{{ '%.0f'|format(room.price) }}<span style="font-size:15px">/night</span></div>
-          <p style="color:var(--gray-500);font-size:14px;margin:8px 0 20px">Taxes & fees calculated at checkout.</p>
+          <div class="room-price" style="font-size:32px">€{{ '%.0f'|format(room.price) }}<span style="font-size:15px">{% if lang=='lv' %}/naktī{% else %}/night{% endif %}</span></div>
+          <p style="color:var(--gray-500);font-size:14px;margin:8px 0 20px">{% if lang=='lv' %}Nodokļi un maksas tiek aprēķinātas norēķinoties.{% else %}Taxes & fees calculated at checkout.{% endif %}</p>
 
           <!-- INLINE BOOK NOW FORM (no extra page) -->
           <form method="post" action="{{ url_for('booking', room_id=room.id) }}" id="inlineBookForm">
             <div class="form-group">
-              <label>Check-in</label>
-              <input type="text" id="ib_check_in" name="check_in" placeholder="Select check-in date" required readonly>
+              <label>{% if lang=='lv' %}Reģistrēšanās{% else %}Check-in{% endif %}</label>
+              <input type="text" id="ib_check_in" name="check_in" placeholder="{% if lang=='lv' %}Izvēlieties reģistrēšanās datumu{% else %}Select check-in date{% endif %}" required readonly>
             </div>
             <div class="form-group">
-              <label>Check-out</label>
-              <input type="text" id="ib_check_out" name="check_out" placeholder="Select check-out date" required readonly>
+              <label>{% if lang=='lv' %}Izrakstīšanās{% else %}Check-out{% endif %}</label>
+              <input type="text" id="ib_check_out" name="check_out" placeholder="{% if lang=='lv' %}Izvēlieties izrakstīšanās datumu{% else %}Select check-out date{% endif %}" required readonly>
             </div>
             <div class="form-group">
-              <label>Guests</label>
+              <label>{% if lang=='lv' %}Viesi{% else %}Guests{% endif %}</label>
               <select name="guests">
-                {% for n in range(1, room.capacity + 1) %}<option value="{{ n }}">{{ n }} guest{{ 's' if n > 1 }}</option>{% endfor %}
+                {% for n in range(1, room.capacity + 1) %}<option value="{{ n }}">{{ n }} {% if lang=='lv' %}viesis{% else %}guest{{ 's' if n > 1 }}{% endif %}</option>{% endfor %}
               </select>
             </div>
-            <div id="ibSummaryLine" style="color:var(--gray-500);font-size:13px;margin-bottom:12px">Select dates to see total</div>
-            <button type="submit" class="btn-primary btn-full">Book Now</button>
+            <div id="ibSummaryLine" style="color:var(--gray-500);font-size:13px;margin-bottom:12px">{% if lang=='lv' %}Izvēlieties datumus, lai redzētu kopsummu{% else %}Select dates to see total{% endif %}</div>
+            <button type="submit" class="btn-primary btn-full">{% if lang=='lv' %}Rezervēt tagad{% else %}Book Now{% endif %}</button>
           </form>
-          <div style="text-align:center;margin-top:14px"><span class="pay-badge">🔒 Secure Stripe checkout</span></div>
+          <div style="text-align:center;margin-top:14px"><span class="pay-badge">🔒 {% if lang=='lv' %}Drošs Stripe norēķins{% else %}Secure Stripe checkout{% endif %}</span></div>
 
           <!-- NEED HELP? -->
           <div class="help-box">
-            <h3>Need Help?</h3>
+            <h3>{% if lang=='lv' %}Nepieciešama palīdzība?{% else %}Need Help?{% endif %}</h3>
             <div class="help-box-divider"></div>
             <div class="help-icons">
               <a class="help-icon email" href="mailto:hello@riganest.com?subject={{ ('Question about ' ~ room.name)|urlencode }}" aria-label="Email us" title="Email us">✉️</a>
@@ -179,14 +287,14 @@
                 </svg>
               </a>
             </div>
-            <p>Having issues with your booking? Contact us for assistance.</p>
+            <p>{% if lang=='lv' %}Ir problēmas ar rezervāciju? Sazinieties ar mums, lai saņemtu palīdzību.{% else %}Having issues with your booking? Contact us for assistance.{% endif %}</p>
           </div>
         </div>
 
         <!-- RELATED ROOMS -->
         {% if related_rooms %}
         <div style="margin-top:28px">
-          <div class="related-rooms-title">Related Rooms</div>
+          <div class="related-rooms-title">{% if lang=='lv' %}Saistītās istabas{% else %}Related Rooms{% endif %}</div>
           {% for r in related_rooms %}
           <a class="related-room-card" href="{{ url_for('room_detail', room_id=r.id) }}">
             {% set rcover = r.image_url() or (r.photo_urls()[0] if r.photo_urls() else None) %}
@@ -197,7 +305,7 @@
             {% endif %}
             <div class="related-room-info">
               <div class="related-room-name">{{ r.name }}</div>
-              <span class="btn-related">View Details</span>
+              <span class="btn-related">{% if lang=='lv' %}Skatīt informāciju{% else %}View Details{% endif %}</span>
             </div>
           </a>
           {% endfor %}

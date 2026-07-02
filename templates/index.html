@@ -1,6 +1,17 @@
 {% extends "base.html" %}
 {% block title %}RigaNest — Comfortable Stays in Riga{% endblock %}
 
+{% block head %}
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css">
+<style>
+.flatpickr-calendar { font-family: inherit; border-radius: 16px; box-shadow: 0 8px 40px rgba(0,0,0,.18); border:none; }
+.flatpickr-day.selected, .flatpickr-day.startRange, .flatpickr-day.endRange { background:var(--primary); border-color:var(--primary); }
+.flatpickr-day.inRange { background:rgba(90,110,232,.12); border-color:transparent; }
+.flatpickr-calendar.rangeMode .flatpickr-days { width: auto; }
+.flatpickr-calendar.multiMonth .flatpickr-days { border-left: 1px solid #eee; }
+</style>
+{% endblock %}
+
 {% block content %}
 <div class="page page-wrap">
 
@@ -20,20 +31,20 @@
       <h1>{% if lang=='lv' %}Rezervējiet savu uzturēšanos{% else %}Book Your Stay{% endif %}</h1>
       <p class="hero-sub">{% if lang=='lv' %}Mājīgi apartamenti Rīgas sirdī{% else %}Comfortable apartments in the heart of Riga{% endif %}</p>
 
-      <form class="search-box-dates" method="get" action="{{ url_for('rooms') }}">
+      <form class="search-box-dates" method="get" action="{{ url_for('rooms') }}" id="heroSearchForm">
         <div class="search-field">
           <label>
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/></svg>
             {% if lang=='lv' %}Reģistrēšanās datums{% else %}Check-in Date{% endif %}
           </label>
-          <input type="date" name="check_in" value="{{ today }}" min="{{ today }}" required>
+          <input type="text" id="hero_check_in" name="check_in" placeholder="Add date" readonly required style="cursor:pointer">
         </div>
         <div class="search-field">
           <label>
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/></svg>
             {% if lang=='lv' %}Izrakstīšanās datums{% else %}Check-out Date{% endif %}
           </label>
-          <input type="date" name="check_out" value="{{ tomorrow }}" min="{{ tomorrow }}" required>
+          <input type="text" id="hero_check_out" name="check_out" placeholder="Add date" readonly required style="cursor:pointer">
         </div>
         <div class="search-field">
           <label>
@@ -143,6 +154,7 @@
 {% endblock %}
 
 {% block scripts %}
+<script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
 <script>
   // Hero image slider
   const slides = document.querySelectorAll('.hero-slide');
@@ -157,5 +169,31 @@
   }
   dots.forEach(d => d.addEventListener('click', () => go(parseInt(d.dataset.i))));
   if (slides.length > 1) setInterval(() => go(cur + 1), 5000);
+
+  // Hero date-range picker (single calendar, two months side-by-side, like Booking.com)
+  (function(){
+    var ciEl = document.getElementById('hero_check_in');
+    var coEl = document.getElementById('hero_check_out');
+
+    function fmt(d){
+      var y = d.getFullYear(), m = String(d.getMonth()+1).padStart(2,'0'), day = String(d.getDate()).padStart(2,'0');
+      return y + '-' + m + '-' + day;
+    }
+
+    var fp = flatpickr(ciEl, {
+      mode: 'range',
+      minDate: 'today',
+      dateFormat: 'Y-m-d',
+      showMonths: 2,
+      disableMobile: true,
+      onChange: function(selectedDates){
+        if (selectedDates.length >= 1) ciEl.value = fmt(selectedDates[0]);
+        if (selectedDates.length === 2) coEl.value = fmt(selectedDates[1]);
+      }
+    });
+
+    // Clicking the check-out field opens the same range calendar
+    coEl.addEventListener('click', function(){ fp.open(); });
+  })();
 </script>
 {% endblock %}

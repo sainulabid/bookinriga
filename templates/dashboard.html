@@ -4,13 +4,22 @@
 {% block content %}
 <div class="page page-wrap">
   <div class="container" style="padding:50px 24px">
-    <h1 style="font-size:34px;margin-bottom:6px">My Bookings</h1>
-    <p style="color:var(--gray-500);margin-bottom:32px">Welcome back, {{ current_user.name }}.</p>
+    <h1 style="font-size:34px;margin-bottom:6px">{% if lang=='lv' %}Manas rezervācijas{% else %}My Bookings{% endif %}</h1>
+    <p style="color:var(--gray-500);margin-bottom:32px">{% if lang=='lv' %}Laipni lūdzam atpakaļ, {{ current_user.name }}.{% else %}Welcome back, {{ current_user.name }}.{% endif %}</p>
 
     {% if bookings %}
     <table class="admin-table">
       <thead>
-        <tr><th>Room</th><th>Check-in</th><th>Check-out</th><th>Nights</th><th>Total</th><th>Payment</th><th>Status</th><th></th></tr>
+        <tr>
+          <th>{% if lang=='lv' %}Istaba{% else %}Room{% endif %}</th>
+          <th>{% if lang=='lv' %}Reģistrēšanās{% else %}Check-in{% endif %}</th>
+          <th>{% if lang=='lv' %}Izrakstīšanās{% else %}Check-out{% endif %}</th>
+          <th>{% if lang=='lv' %}Naktis{% else %}Nights{% endif %}</th>
+          <th>{% if lang=='lv' %}Kopā{% else %}Total{% endif %}</th>
+          <th>{% if lang=='lv' %}Maksājums{% else %}Payment{% endif %}</th>
+          <th>{% if lang=='lv' %}Statuss{% else %}Status{% endif %}</th>
+          <th></th>
+        </tr>
       </thead>
       <tbody>
         {% for b in bookings %}
@@ -22,14 +31,14 @@
           <td>€{{ '%.0f'|format(b.total_price) }}</td>
           <td><span class="badge {{ 'badge-green' if b.payment_status=='Paid' else 'badge-gold' }}">{{ b.payment_status }}</span></td>
           <td>
-            {% if b.status=='Confirmed' %}<span class="badge badge-green">Confirmed</span>
-            {% elif b.status=='Pending' %}<span class="badge badge-gold">Pending</span>
-            {% else %}<span class="badge badge-red">Cancelled</span>{% endif %}
+            {% if b.status=='Confirmed' %}<span class="badge badge-green">{% if lang=='lv' %}Apstiprināta{% else %}Confirmed{% endif %}</span>
+            {% elif b.status=='Pending' %}<span class="badge badge-gold">{% if lang=='lv' %}Gaida{% else %}Pending{% endif %}</span>
+            {% else %}<span class="badge badge-red">{% if lang=='lv' %}Atcelta{% else %}Cancelled{% endif %}</span>{% endif %}
           </td>
           <td>
             {% if b.status=='Confirmed' and b.check_in >= today %}
-            <form method="post" action="{{ url_for('cancel_confirmed', booking_id=b.id) }}" onsubmit="return confirm('Cancel this booking?');">
-              <button class="btn-sm" style="background:var(--danger-soft);color:var(--danger);border:none;padding:6px 14px;border-radius:var(--radius);font-weight:600;cursor:pointer">Cancel</button>
+            <form method="post" action="{{ url_for('cancel_confirmed', booking_id=b.id) }}" onsubmit="return confirm('{% if lang=='lv' %}Atcelt šo rezervāciju?{% else %}Cancel this booking?{% endif %}');">
+              <button class="btn-sm" style="background:var(--danger-soft);color:var(--danger);border:none;padding:6px 14px;border-radius:var(--radius);font-weight:600;cursor:pointer">{% if lang=='lv' %}Atcelt{% else %}Cancel{% endif %}</button>
             </form>
             {% endif %}
           </td>
@@ -39,9 +48,9 @@
     </table>
     {% else %}
     <div class="empty-state">
-      <h3>No bookings yet</h3>
-      <p>When you reserve a room it will appear here.</p>
-      <a href="{{ url_for('rooms') }}" class="btn-primary" style="margin-top:18px">Browse Rooms</a>
+      <h3>{% if lang=='lv' %}Vēl nav rezervāciju{% else %}No bookings yet{% endif %}</h3>
+      <p>{% if lang=='lv' %}Kad rezervēsiet istabu, tā parādīsies šeit.{% else %}When you reserve a room it will appear here.{% endif %}</p>
+      <a href="{{ url_for('rooms') }}" class="btn-primary" style="margin-top:18px">{% if lang=='lv' %}Pārlūkot istabas{% else %}Browse Rooms{% endif %}</a>
     </div>
     {% endif %}
   </div>

@@ -5,17 +5,18 @@
 <div class="page page-wrap">
   <div class="container" style="padding-top:40px">
     <div class="breadcrumb" style="font-size:13px;color:var(--gray-500);margin-bottom:8px">
-      <a href="{{ url_for('index') }}" style="color:var(--primary)">Home</a> /
-      <a href="{{ url_for('attractions') }}" style="color:var(--primary)">Attractions</a> / {{ attraction.name }}
+      <a href="{{ url_for('index') }}" style="color:var(--primary)">{% if lang=='lv' %}Sākums{% else %}Home{% endif %}</a> /
+      <a href="{{ url_for('attractions') }}" style="color:var(--primary)">{% if lang=='lv' %}Apskates vietas{% else %}Attractions{% endif %}</a> / {{ attraction.name }}
     </div>
-    <p class="section-label">Attractions</p>
+    <p class="section-label">{% if lang=='lv' %}Apskates vietas{% else %}Attractions{% endif %}</p>
     <h1 style="font-size:34px;margin:0 0 28px">{{ attraction.name }}</h1>
 
     <div class="attraction-detail-grid">
 
-      <!-- LEFT: photo + general/booking info -->
+      <!-- LEFT: photo + general/booking info (75%) -->
       <div>
-        <div class="detail-slider" id="slider" style="height:280px">
+        <!-- PHOTO SLIDESHOW — same style as rooms page -->
+        <div class="detail-slider" id="slider">
           {% if photos %}
             {% for p in photos %}
             <div class="detail-slide{% if loop.first %} active{% endif %}" style="background-image:url('{{ p }}')"></div>
@@ -36,56 +37,57 @@
         </div>
         {% endif %}
 
+        <!-- SUMMARY — below photos -->
+        <div style="margin-top:28px">
+          <p style="color:var(--gray-700);line-height:1.8;font-size:15px;white-space:pre-line">{{ attraction.summary }}</p>
+        </div>
+
         {% if attraction.location %}
         <p style="margin-top:16px;font-size:13px;color:var(--gray-500)">
-          <strong style="color:var(--gray-900)">Directions =</strong>
-          <a href="https://maps.google.com/maps?q={{ attraction.location|urlencode }}" target="_blank" style="color:var(--primary);font-weight:600">See Map</a>
+          <strong style="color:var(--gray-900)">{% if lang=='lv' %}Norādes{% else %}Directions{% endif %} =</strong>
+          <a href="https://maps.google.com/maps?q={{ attraction.location|urlencode }}" target="_blank" style="color:var(--primary);font-weight:600">{% if lang=='lv' %}Skatīt karti{% else %}See Map{% endif %}</a>
         </p>
         {% endif %}
 
-        <h4>General Information</h4>
+        <h4>{% if lang=='lv' %}Vispārīga informācija{% else %}General Information{% endif %}</h4>
         <div class="attraction-info-list">
-          <p><strong>Allow Children?</strong> {{ "Yes, children are allowed" if attraction.allow_children else "No, children are not allowed" }}</p>
-          <p><strong>Allow Smoking?</strong> {{ "Yes, smoking is allowed" if attraction.allow_smoking else "No, smoking is not allowed" }}</p>
-          <p><strong>Allow pets?</strong> {{ "Yes, well behaved dogs are allowed" if attraction.allow_pets else "No, pets are not allowed" }}</p>
-          <p><strong>Is there Parking?</strong> {{ "Yes, there is customer parking" if attraction.has_parking else "No dedicated parking on site" }}</p>
-          <p><strong>Are there Handicap Facilities?</strong> {{ "Yes, there are Handicap Facilities" if attraction.has_handicap else "No handicap facilities" }}</p>
+          <p><strong>{% if lang=='lv' %}Vai atļauts ar bērniem?{% else %}Allow Children?{% endif %}</strong> {% if lang=='lv' %}{{ "Jā, bērni ir atļauti" if attraction.allow_children else "Nē, bērni nav atļauti" }}{% else %}{{ "Yes, children are allowed" if attraction.allow_children else "No, children are not allowed" }}{% endif %}</p>
+          <p><strong>{% if lang=='lv' %}Vai atļauts smēķēt?{% else %}Allow Smoking?{% endif %}</strong> {% if lang=='lv' %}{{ "Jā, smēķēšana ir atļauta" if attraction.allow_smoking else "Nē, smēķēšana nav atļauta" }}{% else %}{{ "Yes, smoking is allowed" if attraction.allow_smoking else "No, smoking is not allowed" }}{% endif %}</p>
+          <p><strong>{% if lang=='lv' %}Vai atļauts ar mājdzīvniekiem?{% else %}Allow pets?{% endif %}</strong> {% if lang=='lv' %}{{ "Jā, labi audzināti suņi ir atļauti" if attraction.allow_pets else "Nē, mājdzīvnieki nav atļauti" }}{% else %}{{ "Yes, well behaved dogs are allowed" if attraction.allow_pets else "No, pets are not allowed" }}{% endif %}</p>
+          <p><strong>{% if lang=='lv' %}Vai ir autostāvvieta?{% else %}Is there Parking?{% endif %}</strong> {% if lang=='lv' %}{{ "Jā, ir klientu autostāvvieta" if attraction.has_parking else "Nav speciālas autostāvvietas" }}{% else %}{{ "Yes, there is customer parking" if attraction.has_parking else "No dedicated parking on site" }}{% endif %}</p>
+          <p><strong>{% if lang=='lv' %}Vai ir ērtības cilvēkiem ar invaliditāti?{% else %}Are there Handicap Facilities?{% endif %}</strong> {% if lang=='lv' %}{{ "Jā, ir pieejamas ērtības cilvēkiem ar invaliditāti" if attraction.has_handicap else "Nav ērtību cilvēkiem ar invaliditāti" }}{% else %}{{ "Yes, there are Handicap Facilities" if attraction.has_handicap else "No handicap facilities" }}{% endif %}</p>
         </div>
 
-        <h4>Booking Information</h4>
+        <h4>{% if lang=='lv' %}Rezervācijas informācija{% else %}Booking Information{% endif %}</h4>
         <div class="attraction-info-list">
-          <p><strong>Opening Time =</strong> {{ attraction.opening_time }}</p>
-          <p><strong>Closing Time =</strong> {{ attraction.closing_time }}</p>
-          <p><strong>Adult Price =</strong> {{ attraction.adult_price }}</p>
-          <p><strong>Children Price =</strong> {{ attraction.children_price }}</p>
-          <p><strong>OAP Price =</strong> {{ attraction.oap_price }}</p>
+          <p><strong>{% if lang=='lv' %}Atvēršanas laiks{% else %}Opening Time{% endif %} =</strong> {{ attraction.opening_time }}</p>
+          <p><strong>{% if lang=='lv' %}Slēgšanas laiks{% else %}Closing Time{% endif %} =</strong> {{ attraction.closing_time }}</p>
+          <p><strong>{% if lang=='lv' %}Pieaugušo cena{% else %}Adult Price{% endif %} =</strong> {{ attraction.adult_price }}</p>
+          <p><strong>{% if lang=='lv' %}Bērnu cena{% else %}Children Price{% endif %} =</strong> {{ attraction.children_price }}</p>
+          <p><strong>{% if lang=='lv' %}Pensionāru cena{% else %}OAP Price{% endif %} =</strong> {{ attraction.oap_price }}</p>
         </div>
       </div>
 
-      <!-- MIDDLE: summary -->
-      <div class="summary-card" style="background:#fff;border:1px solid var(--gray-100);border-radius:var(--radius-lg);padding:28px;box-shadow:var(--shadow-sm)">
-        <h4 style="margin-top:0">Summary</h4>
-        <p style="color:var(--gray-700);line-height:1.8;font-size:14px;white-space:pre-line">{{ attraction.summary }}</p>
-      </div>
-
-      <!-- RIGHT: location map + book now -->
-      <div class="summary-card" style="background:#fff;border:1px solid var(--gray-100);border-radius:var(--radius-lg);padding:28px;box-shadow:var(--shadow-sm)">
-        <h4 style="margin-top:0">Location</h4>
-        {% if attraction.location %}
-        <iframe class="map-frame" style="height:220px" loading="lazy"
-          src="https://maps.google.com/maps?q={{ attraction.location|urlencode }}&output=embed"></iframe>
-        {% endif %}
-        <a href="{{ attraction.booking_url if attraction.booking_url else ('https://wa.me/' ~ whatsapp_digits ~ '?text=' ~ (('Hi! I would like to know more about ' ~ attraction.name ~ '.')|urlencode)) }}"
-           target="_blank" rel="noopener" class="btn-primary btn-full" style="margin-top:18px">
-          {{ 'Book Now' if attraction.booking_url else 'Ask About This' }}
-        </a>
+      <!-- RIGHT: location map + book now (25%) -->
+      <div style="position:sticky;top:90px">
+        <div class="summary-card" style="background:#fff;border:1px solid var(--gray-100);border-radius:var(--radius-lg);padding:28px;box-shadow:var(--shadow-md)">
+          <h4 style="margin-top:0">{% if lang=='lv' %}Atrašanās vieta{% else %}Location{% endif %}</h4>
+          {% if attraction.location %}
+          <iframe class="map-frame" style="height:220px" loading="lazy"
+            src="https://maps.google.com/maps?q={{ attraction.location|urlencode }}&output=embed"></iframe>
+          {% endif %}
+          <a href="{{ attraction.booking_url if attraction.booking_url else ('https://wa.me/' ~ whatsapp_digits ~ '?text=' ~ (('Hi! I would like to know more about ' ~ attraction.name ~ '.')|urlencode)) }}"
+             target="_blank" rel="noopener" class="btn-primary btn-full" style="margin-top:18px">
+            {% if lang=='lv' %}{{ 'Rezervēt tagad' if attraction.booking_url else 'Jautāt par šo' }}{% else %}{{ 'Book Now' if attraction.booking_url else 'Ask About This' }}{% endif %}
+          </a>
+        </div>
       </div>
 
     </div>
 
     <!-- MORE ATTRACTIONS -->
     {% if related_attractions %}
-    <h3 style="margin:50px 0 20px;font-size:24px">More Attractions</h3>
+    <h3 style="margin:50px 0 20px;font-size:24px">{% if lang=='lv' %}Vairāk apskates vietu{% else %}More Attractions{% endif %}</h3>
     <div class="rooms-grid">
       {% for r in related_attractions %}
       <a class="room-card" href="{{ url_for('attraction_detail', attraction_id=r.id) }}">

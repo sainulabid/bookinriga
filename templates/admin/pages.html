@@ -1,0 +1,41 @@
+{% extends "base.html" %}
+{% block title %}Admin Pages — RigaNest{% endblock %}
+
+{% block content %}
+<div class="page page-wrap">
+  <div class="container admin-shell">
+    <h1 style="font-size:32px">Pages</h1>
+    <div class="admin-tabs">
+      <a href="{{ url_for('admin_dashboard') }}">Overview</a>
+      <a href="{{ url_for('admin_rooms') }}">Rooms</a>
+      <a href="{{ url_for('admin_attractions') }}">Attractions</a>
+      <a href="{{ url_for('admin_bookings') }}">Bookings</a>
+      <a href="{{ url_for('admin_users') }}">Users</a>
+      <a href="{{ url_for('admin_messages') }}">Messages</a>
+      <a href="{{ url_for('admin_about') }}">About</a>
+      <a href="{{ url_for('admin_pages') }}" class="active">Pages</a>
+      <a href="{{ url_for('admin_settings') }}">Settings</a>
+    </div>
+
+    <table class="admin-table">
+      <thead><tr><th>Page</th><th>Last Updated</th><th>Actions</th></tr></thead>
+      <tbody>
+        {% for pc in pages_config %}
+        {% set p = pages.get(pc.slug) %}
+        <tr>
+          <td style="font-weight:600">{{ pc.title }}</td>
+          <td style="color:var(--gray-500);font-size:13px">
+            {% if p and p.updated_at %}{{ p.updated_at.strftime('%d %b %Y') }}{% else %}Not edited yet{% endif %}
+          </td>
+          <td style="display:flex;gap:10px;align-items:center">
+            <a href="{{ url_for('admin_edit_page', slug=pc.slug) }}" class="btn-primary" style="font-size:13px;padding:7px 16px">Edit</a>
+            <a href="{{ url_for(pc.endpoint) }}" target="_blank"
+               style="font-size:13px;color:var(--primary);font-weight:600">Preview →</a>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endblock %}

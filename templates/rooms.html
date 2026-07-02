@@ -6,9 +6,9 @@
   <div class="page-hero-sm" style="background:linear-gradient(135deg,rgb(0, 74, 170),rgb(26, 115, 232));padding:60px 0;color:#fff">
     <div class="container">
       <div class="breadcrumb" style="color:rgba(255,255,255,0.6);font-size:13px;margin-bottom:10px">
-        <a href="{{ url_for('index') }}" style="color:var(--gold)">Home</a> / Rooms
+        <a href="{{ url_for('index') }}" style="color:var(--gold)">{% if lang=='lv' %}Sākums{% else %}Home{% endif %}</a> / {% if lang=='lv' %}Istabas{% else %}Rooms{% endif %}
       </div>
-      <h1 style="color:#fff;font-size:38px">Our Rooms & Suites</h1>
+      <h1 style="color:#fff;font-size:38px">{% if lang=='lv' %}Mūsu istabas un apartamenti{% else %}Our Rooms & Suites{% endif %}</h1>
     </div>
   </div>
 
@@ -17,36 +17,36 @@
       <!-- Filter bar -->
       <form method="get" class="search-box rooms-filter-bar" style="margin-bottom:20px;box-shadow:var(--shadow-md)">
         <div class="search-field">
-          <label>Check-in</label>
+          <label>{% if lang=='lv' %}Reģistrēšanās{% else %}Check-in{% endif %}</label>
           <input type="date" name="check_in" value="{{ check_in or '' }}">
         </div>
         <div class="search-field">
-          <label>Check-out</label>
+          <label>{% if lang=='lv' %}Izrakstīšanās{% else %}Check-out{% endif %}</label>
           <input type="date" name="check_out" value="{{ check_out or '' }}">
         </div>
         <div class="search-field">
-          <label>Search</label>
-          <input type="text" name="q" value="{{ q or '' }}" placeholder="Room name or type">
+          <label>{% if lang=='lv' %}Meklēt{% else %}Search{% endif %}</label>
+          <input type="text" name="q" value="{{ q or '' }}" placeholder="{% if lang=='lv' %}Istabas nosaukums vai tips{% else %}Room name or type{% endif %}">
         </div>
         <div class="search-field">
-          <label>Max price</label>
-          <input type="number" name="max_price" value="{{ max_price or '' }}" placeholder="€ any">
+          <label>{% if lang=='lv' %}Maksimālā cena{% else %}Max price{% endif %}</label>
+          <input type="number" name="max_price" value="{{ max_price or '' }}" placeholder="{% if lang=='lv' %}€ jebkura{% else %}€ any{% endif %}">
         </div>
         <div class="search-field">
-          <label>Guests</label>
+          <label>{% if lang=='lv' %}Viesi{% else %}Guests{% endif %}</label>
           <select name="guests">
-            <option value="">Any</option>
+            <option value="">{% if lang=='lv' %}Jebkurš{% else %}Any{% endif %}</option>
             {% for n in range(1,6) %}<option value="{{ n }}" {{ 'selected' if guests==n }}>{{ n }}+</option>{% endfor %}
           </select>
         </div>
-        <button class="search-btn" type="submit">Filter</button>
+        <button class="search-btn" type="submit">{% if lang=='lv' %}Filtrēt{% else %}Filter{% endif %}</button>
       </form>
 
       {% if date_error %}
       <div style="background:#fdecea;color:#b3261e;border:1px solid #f5c6c2;border-radius:var(--radius);padding:12px 18px;font-size:14px;margin-bottom:24px">⚠️ {{ date_error }}</div>
       {% elif check_in and check_out %}
       <p style="color:var(--gray-500);font-size:14px;margin-bottom:24px">
-        ✅ Showing rooms available from <strong>{{ check_in }}</strong> to <strong>{{ check_out }}</strong>
+        {% if lang=='lv' %}✅ Rāda pieejamās istabas no <strong>{{ check_in }}</strong> līdz <strong>{{ check_out }}</strong>{% else %}✅ Showing rooms available from <strong>{{ check_in }}</strong> to <strong>{{ check_out }}</strong>{% endif %}
       </p>
       {% endif %}
 
@@ -69,7 +69,7 @@
               {% for a in room.amenity_list()[:3] %}<span class="amenity-tag">{{ a }}</span>{% endfor %}
             </div>
             <div class="room-footer">
-              <div class="room-price">€{{ '%.0f'|format(room.price) }}<span>/night</span></div>
+              <div class="room-price">€{{ '%.0f'|format(room.price) }}<span>{% if lang=='lv' %}/naktī{% else %}/night{% endif %}</span></div>
               <div class="room-stars">★ {{ '%.1f'|format(room.rating) }}</div>
             </div>
           </div>
@@ -77,7 +77,7 @@
         {% endfor %}
       </div>
       {% else %}
-      <div class="empty-state"><h3>No rooms match your filters</h3><p>Try widening your search.</p></div>
+      <div class="empty-state"><h3>{% if lang=='lv' %}Nav istabu, kas atbilst jūsu filtriem{% else %}No rooms match your filters{% endif %}</h3><p>{% if lang=='lv' %}Mēģiniet paplašināt meklēšanu.{% else %}Try widening your search.{% endif %}</p></div>
       {% endif %}
     </div>
   </section>
