@@ -7,8 +7,10 @@ Run:  python app.py   ->  http://127.0.0.1:5000
 
 Config (optional) via environment variables or a .env file:
   STRIPE_SECRET_KEY, STRIPE_PUBLISHABLE_KEY   -> real card payments
-  GMAIL_ADDRESS, GMAIL_APP_PASSWORD           -> real Gmail email OTP
-If these are not set, the app runs in DEV MODE:
+  RESEND_API_KEY, RESEND_FROM_EMAIL           -> real email OTP via Resend API (recommended,
+                                                  works even on hosts that block outbound SMTP)
+  GMAIL_ADDRESS, GMAIL_APP_PASSWORD           -> real Gmail email OTP (fallback, needs SMTP access)
+If none of these are set, the app runs in DEV MODE:
   - payments are auto-approved (no real charge)
   - the OTP code is printed to the terminal AND shown on screen
 """
@@ -18,6 +20,7 @@ import cloudinary
 import cloudinary.uploader
 import random
 import smtplib
+import requests
 from email.mime.text import MIMEText
 from datetime import datetime, date, timedelta
 from functools import wraps
@@ -54,6 +57,8 @@ STRIPE_SECRET_KEY = os.environ.get("STRIPE_SECRET_KEY", "")
 STRIPE_PUBLISHABLE_KEY = os.environ.get("STRIPE_PUBLISHABLE_KEY", "")
 GMAIL_ADDRESS = os.environ.get("GMAIL_ADDRESS", "")
 GMAIL_APP_PASSWORD = os.environ.get("GMAIL_APP_PASSWORD", "")
+RESEND_API_KEY = os.environ.get("RESEND_API_KEY", "")
+RESEND_FROM_EMAIL = os.environ.get("RESEND_FROM_EMAIL", "onboarding@resend.dev")
 GOOGLE_CLIENT_ID = os.environ.get("GOOGLE_CLIENT_ID", "")
 GOOGLE_CLIENT_SECRET = os.environ.get("GOOGLE_CLIENT_SECRET", "")
 
@@ -63,7 +68,8 @@ CLOUDINARY_API_SECRET = os.environ.get("CLOUDINARY_API_SECRET", "")
 CLOUDINARY_ENABLED = bool(CLOUDINARY_CLOUD_NAME and CLOUDINARY_API_KEY and CLOUDINARY_API_SECRET)
 
 PAYMENTS_LIVE = bool(STRIPE_SECRET_KEY)
-EMAIL_LIVE = bool(GMAIL_ADDRESS and GMAIL_APP_PASSWORD)
+RESEND_ENABLED = bool(RESEND_API_KEY)
+EMAIL_LIVE = bool(RESEND_ENABLED or (GMAIL_ADDRESS and GMAIL_APP_PASSWORD))
 GOOGLE_LOGIN_ENABLED = bool(GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET)
 
 # WhatsApp contact number shown as a floating button site-wide and on the
@@ -364,19 +370,50 @@ def send_otp(user):
             f"Your RigaNest verification code is: {code}\n"
             f"This code expires in 5 minutes.\n\n"
             f"If you didn't request this, you can ignore this email.")
+    html_body = (f"<p>Hi {user.name},</p>"
+                 f"<p>Your RigaNest verification code is: <strong>{code}</strong></p>"
+                 f"<p>This code expires in 5 minutes.</p>"
+                 f"<p>If you didn't request this, you can ignore this email.</p>")
 
-    if EMAIL_LIVE and user.email:
+    # 1) Try Resend first (HTTP API, works reliably even on hosts that
+    #    block outbound SMTP ports, e.g. Render's free tier).
+    if RESEND_ENABLED and user.email:
+        try:
+            resp = requests.post(
+                "https://api.resend.com/emails",
+                headers={
+                    "Authorization": f"Bearer {RESEND_API_KEY}",
+                    "Content-Type": "application/json",
+                },
+                json={
+                    "from": f"RigaNest <{RESEND_FROM_EMAIL}>",
+                    "to": [user.email],
+                    "subject": subject,
+                    "html": html_body,
+                },
+                timeout=10,
+            )
+            if resp.status_code in (200, 201):
+                return None
+            print("Resend send failed:", resp.status_code, resp.text)
+        except Exception as e:
+            print("Resend send error:", e)
+
+    # 2) Fallback: Gmail SMTP (works on hosts that allow outbound SMTP,
+    #    e.g. paid Render plans, VPS, shared hosting).
+    if GMAIL_ADDRESS and GMAIL_APP_PASSWORD and user.email:
         try:
             msg = MIMEText(body)
             msg["Subject"] = subject
             msg["From"] = GMAIL_ADDRESS
             msg["To"] = user.email
-            with smtplib.SMTP_SSL("smtp.gmail.com", 465) as server:
+            with smtplib.SMTP_SSL("smtp.gmail.com", 465, timeout=10) as server:
                 server.login(GMAIL_ADDRESS, GMAIL_APP_PASSWORD)
                 server.sendmail(GMAIL_ADDRESS, [user.email], msg.as_string())
             return None
         except Exception as e:
             print("Gmail send failed:", e)
+
     print(f"\n*** [DEV OTP] {user.email} -> code: {code} ***\n")
     return code
 
