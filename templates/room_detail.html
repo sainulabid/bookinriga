@@ -68,34 +68,26 @@
         <!-- TABS -->
         <div class="tabs">
           <div class="tab-btns">
-            <button class="tab-btn active" data-tab="amenities">{% if lang=='lv' %}Ērtības{% else %}Amenities{% endif %}</button>
-            <button class="tab-btn" data-tab="internet">{% if lang=='lv' %}Internets{% else %}Internet{% endif %}</button>
-            <button class="tab-btn" data-tab="kitchen">{% if lang=='lv' %}Virtuve{% else %}Kitchen{% endif %}</button>
-            <button class="tab-btn" data-tab="suitability">{% if lang=='lv' %}Piemērotība{% else %}Suitability{% endif %}</button>
+            {% for category in FEATURE_CATALOG.keys() %}
+            <button class="tab-btn {{ 'active' if loop.first }}" data-tab="{{ category }}">
+              {{ FEATURE_CATEGORY_LABELS[category][1] if lang=='lv' else FEATURE_CATEGORY_LABELS[category][0] }}
+            </button>
+            {% endfor %}
           </div>
-          <div class="tab-panel active" data-panel="amenities">
-            {% for a in room.amenity_list() %}<span class="tab-chip">✓ {{ a }}</span>{% endfor %}
-            <span class="tab-chip">✓ {% if lang=='lv' %}Gaisa kondicionieris{% else %}Air conditioning{% endif %}</span>
-            <span class="tab-chip">✓ {% if lang=='lv' %}Ikdienas uzkopšana{% else %}Daily housekeeping{% endif %}</span>
-            <span class="tab-chip">✓ {% if lang=='lv' %}Reģistratūra 24/7{% else %}24/7 reception{% endif %}</span>
+          {% for category, tags in FEATURE_CATALOG.items() %}
+          {% set selected = room.feature_tags(category) %}
+          <div class="tab-panel {{ 'active' if loop.first }}" data-panel="{{ category }}">
+            {% if category == 'amenities' %}
+              {% for a in room.amenity_list() %}<span class="tab-chip">✓ {{ a }}</span>{% endfor %}
+            {% endif %}
+            {% for key, label_en, label_lv in tags %}
+              {% if key in selected %}<span class="tab-chip">✓ {{ label_lv if lang=='lv' else label_en }}</span>{% endif %}
+            {% endfor %}
+            {% if not selected and category != 'amenities' %}
+              <span class="tab-chip" style="color:var(--gray-500)">{% if lang=='lv' %}Nav informācijas{% else %}No information added{% endif %}</span>
+            {% endif %}
           </div>
-          <div class="tab-panel" data-panel="internet">
-            <span class="tab-chip">✓ {% if lang=='lv' %}Bezmaksas ātrgaitas WiFi{% else %}Free high-speed WiFi{% endif %}</span>
-            <span class="tab-chip">✓ {% if lang=='lv' %}Vadu internets{% else %}Wired internet{% endif %}</span>
-            <span class="tab-chip">✓ {% if lang=='lv' %}Viedā TV ar straumēšanu{% else %}Smart TV with streaming{% endif %}</span>
-          </div>
-          <div class="tab-panel" data-panel="kitchen">
-            <span class="tab-chip">✓ {% if lang=='lv' %}Tējkanna un kafijas automāts{% else %}Kettle & coffee maker{% endif %}</span>
-            <span class="tab-chip">✓ {% if lang=='lv' %}Minibārs{% else %}Minibar{% endif %}</span>
-            <span class="tab-chip">✓ {% if lang=='lv' %}Bezmaksas ūdens{% else %}Complimentary water{% endif %}</span>
-            <span class="tab-chip">✓ {% if lang=='lv' %}Pieejamas brokastis{% else %}Breakfast available{% endif %}</span>
-          </div>
-          <div class="tab-panel" data-panel="suitability">
-            <span class="tab-chip">✓ {% if lang=='lv' %}Nesmēķētāju telpa{% else %}Non-smoking{% endif %}</span>
-            <span class="tab-chip">✓ {% if lang=='lv' %}Ģimenes gaidītas{% else %}Families welcome{% endif %}</span>
-            <span class="tab-chip">✗ {% if lang=='lv' %}Mājdzīvnieki nav atļauti{% else %}Pets not allowed{% endif %}</span>
-            <span class="tab-chip">✗ {% if lang=='lv' %}Ballītes nav atļautas{% else %}Parties not allowed{% endif %}</span>
-          </div>
+          {% endfor %}
         </div>
 
         <!-- TERMS ACCORDION -->

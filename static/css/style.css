@@ -783,6 +783,15 @@
 .tab-panel.active { display: block; }
 .tab-chip { display: inline-block; border: 1px solid var(--gray-100); border-radius: 8px; padding: 8px 14px; margin: 0 8px 8px 0; font-size: 13px; color: var(--gray-700); }
 
+/* ── FEATURE PICKER (admin room form) ── */
+.feature-cat { margin-bottom: 22px; }
+.feature-cat h4 { font-size: 14px; font-weight: 700; color: var(--gray-900); margin: 0 0 10px; }
+.feature-chip-toggle { display: inline-flex; align-items: center; gap: 6px; border: 1px solid var(--gray-100); border-radius: 8px; padding: 8px 14px; margin: 0 8px 8px 0; font-size: 13px; color: var(--gray-700); cursor: pointer; user-select: none; transition: all .15s ease; }
+.feature-chip-toggle input[type="checkbox"] { display: none; }
+.feature-chip-toggle .fc-mark { display: none; font-weight: 700; }
+.feature-chip-toggle:has(input:checked), .feature-chip-toggle.checked { border-color: var(--primary); background: var(--primary-mid, var(--primary)); color: #fff; }
+.feature-chip-toggle:has(input:checked) .fc-mark, .feature-chip-toggle.checked .fc-mark { display: inline; }
+
 /* ── ACCORDION ── */
 .acc-item { border-bottom: 1px solid var(--gray-100); }
 .acc-head { display: flex; align-items: center; gap: 14px; padding: 18px 4px; cursor: pointer; font-size: 16px; font-weight: 600; color: var(--gray-900); }

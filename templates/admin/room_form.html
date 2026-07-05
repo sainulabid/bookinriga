@@ -19,7 +19,25 @@
         <div class="form-group"><label>Bathrooms *</label><input type="number" name="bathrooms" required min="1" value="{{ room.bathrooms if room else 1 }}"></div>
         <div class="form-group"><label>Size (m²)</label><input type="number" name="size_sqm" min="1" value="{{ room.size_sqm if room else 30 }}"></div>
       </div>
-      <div class="form-group"><label>Amenities (comma separated)</label><input type="text" name="amenities" placeholder="Sea View, WiFi, Breakfast" value="{{ room.amenities if room else '' }}"></div>
+      <div class="form-group"><label>Amenities highlight (comma separated, shown on room cards)</label><input type="text" name="amenities" placeholder="Sea View, WiFi, Breakfast" value="{{ room.amenities if room else '' }}"></div>
+
+      <div class="form-group">
+        <label>Features</label>
+        <p style="font-size:12px;color:var(--gray-500);margin:-2px 0 14px">Pick everything that applies. These show as tabs on the room page.</p>
+        {% for category, tags in FEATURE_CATALOG.items() %}
+        <div class="feature-cat">
+          <h4>{{ FEATURE_CATEGORY_LABELS[category][0] }}</h4>
+          {% set selected = room.feature_tags(category) if room else [] %}
+          {% for key, label_en, label_lv in tags %}
+          <label class="feature-chip-toggle">
+            <input type="checkbox" name="{{ category }}_tags" value="{{ key }}" {{ 'checked' if key in selected }}>
+            <span class="fc-mark">✓</span>{{ label_en }}
+          </label>
+          {% endfor %}
+        </div>
+        {% endfor %}
+      </div>
+
       <div class="form-group"><label>Location (for the map)</label><input type="text" name="location" placeholder="Riga Old Town, Latvia" value="{{ room.location if room else '' }}"></div>
       <div class="form-group"><label>Description</label><textarea name="description">{{ room.description if room else '' }}</textarea></div>
 
@@ -68,4 +86,12 @@
     {% endif %}
   </div>
 </div>
+<script>
+  // Fallback chip highlighting for browsers without CSS :has() support
+  document.querySelectorAll('.feature-chip-toggle input[type="checkbox"]').forEach(function (cb) {
+    var sync = function () { cb.closest('.feature-chip-toggle').classList.toggle('checked', cb.checked); };
+    cb.addEventListener('change', sync);
+    sync();
+  });
+</script>
 {% endblock %}

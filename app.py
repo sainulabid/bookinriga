@@ -7,17 +7,21 @@ Run:  python app.py   ->  http://127.0.0.1:5000
 
 Config (optional) via environment variables or a .env file:
   STRIPE_SECRET_KEY, STRIPE_PUBLISHABLE_KEY   -> real card payments
-  GMAIL_ADDRESS, GMAIL_APP_PASSWORD           -> real Gmail email OTP
-If these are not set, the app runs in DEV MODE:
+  RESEND_API_KEY, RESEND_FROM_EMAIL           -> real email OTP via Resend API (recommended,
+                                                  works even on hosts that block outbound SMTP)
+  GMAIL_ADDRESS, GMAIL_APP_PASSWORD           -> real Gmail email OTP (fallback, needs SMTP access)
+If none of these are set, the app runs in DEV MODE:
   - payments are auto-approved (no real charge)
   - the OTP code is printed to the terminal AND shown on screen
 """
 
 import os
+import json
 import cloudinary
 import cloudinary.uploader
 import random
 import smtplib
+import requests
 from email.mime.text import MIMEText
 from datetime import datetime, date, timedelta
 from functools import wraps
@@ -54,6 +58,8 @@ STRIPE_SECRET_KEY = os.environ.get("STRIPE_SECRET_KEY", "")
 STRIPE_PUBLISHABLE_KEY = os.environ.get("STRIPE_PUBLISHABLE_KEY", "")
 GMAIL_ADDRESS = os.environ.get("GMAIL_ADDRESS", "")
 GMAIL_APP_PASSWORD = os.environ.get("GMAIL_APP_PASSWORD", "")
+RESEND_API_KEY = os.environ.get("RESEND_API_KEY", "")
+RESEND_FROM_EMAIL = os.environ.get("RESEND_FROM_EMAIL", "onboarding@resend.dev")
 GOOGLE_CLIENT_ID = os.environ.get("GOOGLE_CLIENT_ID", "")
 GOOGLE_CLIENT_SECRET = os.environ.get("GOOGLE_CLIENT_SECRET", "")
 
@@ -63,7 +69,8 @@ CLOUDINARY_API_SECRET = os.environ.get("CLOUDINARY_API_SECRET", "")
 CLOUDINARY_ENABLED = bool(CLOUDINARY_CLOUD_NAME and CLOUDINARY_API_KEY and CLOUDINARY_API_SECRET)
 
 PAYMENTS_LIVE = bool(STRIPE_SECRET_KEY)
-EMAIL_LIVE = bool(GMAIL_ADDRESS and GMAIL_APP_PASSWORD)
+RESEND_ENABLED = bool(RESEND_API_KEY)
+EMAIL_LIVE = bool(RESEND_ENABLED or (GMAIL_ADDRESS and GMAIL_APP_PASSWORD))
 GOOGLE_LOGIN_ENABLED = bool(GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET)
 
 # WhatsApp contact number shown as a floating button site-wide and on the
@@ -146,6 +153,76 @@ class User(UserMixin, db.Model):
         return check_password_hash(self.password_hash, pw)
 
 
+FEATURE_CATALOG = {
+    "amenities": [
+        ("heating", "Heating", "Apkure"),
+        ("air_conditioning", "Air conditioning", "Gaisa kondicionieris"),
+        ("iron_board", "Iron board", "Gludināmais dēlis"),
+        ("hair_dryer", "Hair dryer", "Fēns"),
+        ("linens", "Linens", "Gultas veļa"),
+        ("towels", "Towels", "Dvieļi"),
+        ("smoke_detector", "Smoke detector", "Dūmu detektors"),
+        ("daily_housekeeping", "Daily housekeeping", "Ikdienas uzkopšana"),
+        ("reception_247", "24/7 reception", "Reģistratūra 24/7"),
+        ("elevator", "Elevator", "Lifts"),
+        ("river_view", "River view", "Skats uz upi"),
+        ("balcony", "Balcony", "Balkons"),
+        ("parking", "Parking", "Autostāvvieta"),
+        ("washer", "Washer", "Veļas mašīna"),
+    ],
+    "entertainment": [
+        ("smart_tv", "Smart TV with streaming", "Viedā TV ar straumēšanu"),
+        ("streaming", "Streaming services", "Straumēšanas pakalpojumi"),
+        ("board_games", "Board games", "Galda spēles"),
+        ("books", "Books", "Grāmatas"),
+        ("sound_system", "Sound system", "Skaņas sistēma"),
+    ],
+    "internet": [
+        ("free_wifi", "Free high-speed WiFi", "Bezmaksas ātrgaitas WiFi"),
+        ("wired_internet", "Wired internet", "Vadu internets"),
+        ("workspace", "Dedicated workspace", "Darba vieta"),
+    ],
+    "kitchen": [
+        ("full_kitchen", "Full kitchen", "Pilna virtuve"),
+        ("kitchenette", "Kitchenette", "Neliela virtuve"),
+        ("refrigerator", "Refrigerator", "Ledusskapis"),
+        ("microwave", "Microwave", "Mikroviļņu krāsns"),
+        ("dishwasher", "Dishwasher", "Trauku mazgājamā mašīna"),
+        ("kettle_coffee", "Kettle & coffee maker", "Tējkanna un kafijas automāts"),
+        ("minibar", "Minibar", "Minibārs"),
+        ("breakfast", "Breakfast available", "Pieejamas brokastis"),
+        ("water", "Complimentary water", "Bezmaksas ūdens"),
+    ],
+    "pets": [
+        ("pets_allowed", "Pets allowed", "Mājdzīvnieki atļauti"),
+        ("pet_bowl", "Pet bowl provided", "Bļoda mājdzīvniekiem"),
+        ("pet_walk_area", "Nearby pet walking area", "Tuvumā pastaigu vieta mājdzīvniekiem"),
+    ],
+    "suitability": [
+        ("non_smoking", "Non-smoking", "Nesmēķētāju telpa"),
+        ("families_welcome", "Families welcome", "Ģimenes gaidītas"),
+        ("child_friendly", "Suitable for children", "Piemērots bērniem"),
+        ("wheelchair_accessible", "Wheelchair accessible", "Piemērots ratiņkrēslu lietotājiem"),
+        ("no_parties", "Parties not allowed", "Ballītes nav atļautas"),
+        ("long_stays", "Long-term stays welcome", "Iespējama ilgtermiņa uzturēšanās"),
+    ],
+}
+
+FEATURE_CATEGORY_LABELS = {
+    "amenities": ("Amenities", "Ērtības"),
+    "entertainment": ("Entertainment", "Izklaide"),
+    "internet": ("Internet", "Internets"),
+    "kitchen": ("Kitchen", "Virtuve"),
+    "pets": ("Pets", "Mājdzīvnieki"),
+    "suitability": ("Suitability", "Piemērotība"),
+}
+
+app.jinja_env.globals.update(
+    FEATURE_CATALOG=FEATURE_CATALOG,
+    FEATURE_CATEGORY_LABELS=FEATURE_CATEGORY_LABELS,
+)
+
+
 class Room(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     name = db.Column(db.String(120), nullable=False)
@@ -158,6 +235,7 @@ class Room(db.Model):
     bathrooms = db.Column(db.Integer, default=1)
     rating = db.Column(db.Float, default=4.8)
     amenities = db.Column(db.String(255), default="WiFi, AC, Breakfast")
+    features = db.Column(db.Text, default="{}")  # JSON: {"amenities": ["heating", ...], "kitchen": [...], ...}
     image = db.Column(db.String(255), default="")
     location = db.Column(db.String(200), default="")
     is_active = db.Column(db.Boolean, default=True)
@@ -174,6 +252,21 @@ class Room(db.Model):
 
     def amenity_list(self):
         return [a.strip() for a in self.amenities.split(",") if a.strip()]
+
+    def features_dict(self):
+        """Return the saved feature tags as {category: [tag_key, ...]}."""
+        try:
+            data = json.loads(self.features or "{}")
+            return data if isinstance(data, dict) else {}
+        except (ValueError, TypeError):
+            return {}
+
+    def feature_tags(self, category):
+        """List of selected tag keys for one category (e.g. 'kitchen')."""
+        return self.features_dict().get(category, [])
+
+    def has_feature(self, category, key):
+        return key in self.feature_tags(category)
 
     def photo_urls(self):
         """Extra photos for the slideshow only. Cover shown separately."""
@@ -364,19 +457,50 @@ def send_otp(user):
             f"Your RigaNest verification code is: {code}\n"
             f"This code expires in 5 minutes.\n\n"
             f"If you didn't request this, you can ignore this email.")
+    html_body = (f"<p>Hi {user.name},</p>"
+                 f"<p>Your RigaNest verification code is: <strong>{code}</strong></p>"
+                 f"<p>This code expires in 5 minutes.</p>"
+                 f"<p>If you didn't request this, you can ignore this email.</p>")
 
-    if EMAIL_LIVE and user.email:
+    # 1) Try Resend first (HTTP API, works reliably even on hosts that
+    #    block outbound SMTP ports, e.g. Render's free tier).
+    if RESEND_ENABLED and user.email:
+        try:
+            resp = requests.post(
+                "https://api.resend.com/emails",
+                headers={
+                    "Authorization": f"Bearer {RESEND_API_KEY}",
+                    "Content-Type": "application/json",
+                },
+                json={
+                    "from": f"RigaNest <{RESEND_FROM_EMAIL}>",
+                    "to": [user.email],
+                    "subject": subject,
+                    "html": html_body,
+                },
+                timeout=10,
+            )
+            if resp.status_code in (200, 201):
+                return None
+            print("Resend send failed:", resp.status_code, resp.text)
+        except Exception as e:
+            print("Resend send error:", e)
+
+    # 2) Fallback: Gmail SMTP (works on hosts that allow outbound SMTP,
+    #    e.g. paid Render plans, VPS, shared hosting).
+    if GMAIL_ADDRESS and GMAIL_APP_PASSWORD and user.email:
         try:
             msg = MIMEText(body)
             msg["Subject"] = subject
             msg["From"] = GMAIL_ADDRESS
             msg["To"] = user.email
-            with smtplib.SMTP_SSL("smtp.gmail.com", 465) as server:
+            with smtplib.SMTP_SSL("smtp.gmail.com", 465, timeout=10) as server:
                 server.login(GMAIL_ADDRESS, GMAIL_APP_PASSWORD)
                 server.sendmail(GMAIL_ADDRESS, [user.email], msg.as_string())
             return None
         except Exception as e:
             print("Gmail send failed:", e)
+
     print(f"\n*** [DEV OTP] {user.email} -> code: {code} ***\n")
     return code
 
@@ -392,6 +516,19 @@ def upload_image(obj, folder="riganest/rooms"):
             fn = f"{int(datetime.utcnow().timestamp())}_{secure_filename(f.filename)}"
             f.save(os.path.join(app.config["UPLOAD_FOLDER"], fn))
             obj.image = fn
+
+
+def save_room_features(room, form):
+    """Read the per-category checkbox groups from the room form
+    (fields named '<category>_tags', e.g. 'kitchen_tags') and store
+    them as JSON on room.features. Valid tag keys only (ignore junk)."""
+    data = {}
+    for category, tags in FEATURE_CATALOG.items():
+        valid_keys = {key for key, _, _ in tags}
+        selected = [k for k in form.getlist(f"{category}_tags") if k in valid_keys]
+        if selected:
+            data[category] = selected
+    room.features = json.dumps(data)
 
 
 def upload_extra_photos(room):
@@ -858,6 +995,7 @@ def admin_add_room():
             location=request.form.get("location", "").strip(),
             is_active=bool(request.form.get("is_active")),
         )
+        save_room_features(r, request.form)
         upload_image(r, folder="riganest/rooms")
         db.session.add(r)
         db.session.commit()
@@ -884,6 +1022,7 @@ def admin_edit_room(room_id):
         r.amenities = request.form.get("amenities", "").strip()
         r.location = request.form.get("location", "").strip()
         r.is_active = bool(request.form.get("is_active"))
+        save_room_features(r, request.form)
         upload_image(r, folder="riganest/rooms")
         upload_extra_photos(r)
         db.session.commit()
@@ -1238,10 +1377,64 @@ def inject_globals():
 
 
 # ----------------------------------------------------------------------
+# Auto-migration: add any missing columns automatically on startup
+# ----------------------------------------------------------------------
+def auto_migrate():
+    """
+    Compares the SQLAlchemy models against the live database schema and
+    adds any missing columns with ALTER TABLE. This avoids needing shell
+    access on Render every time a new column is added to a model.
+    """
+    from sqlalchemy import inspect, text
+
+    type_map = {
+        "INTEGER": "INTEGER",
+        "VARCHAR": "VARCHAR(255)",
+        "TEXT": "TEXT",
+        "FLOAT": "FLOAT",
+        "BOOLEAN": "BOOLEAN",
+        "DATETIME": "TIMESTAMP",
+        "DATE": "DATE",
+    }
+
+    inspector = inspect(db.engine)
+    existing_tables = inspector.get_table_names()
+
+    for table_name, table in db.metadata.tables.items():
+        if table_name not in existing_tables:
+            continue  # brand-new table, db.create_all() already handles this
+        existing_columns = {c["name"] for c in inspector.get_columns(table_name)}
+        for column in table.columns:
+            if column.name in existing_columns:
+                continue
+            col_type = str(column.type).split("(")[0].upper()
+            sql_type = type_map.get(col_type, "TEXT")
+            default_clause = ""
+            if column.default is not None and getattr(column.default, "is_scalar", False):
+                val = column.default.arg
+                if isinstance(val, bool):
+                    default_clause = f" DEFAULT {'TRUE' if val else 'FALSE'}"
+                elif isinstance(val, (int, float)):
+                    default_clause = f" DEFAULT {val}"
+                elif isinstance(val, str):
+                    default_clause = f" DEFAULT '{val}'"
+            try:
+                db.session.execute(text(
+                    f'ALTER TABLE "{table_name}" ADD COLUMN "{column.name}" {sql_type}{default_clause}'
+                ))
+                db.session.commit()
+                print(f"[auto_migrate] Added column {table_name}.{column.name}")
+            except Exception as e:
+                db.session.rollback()
+                print(f"[auto_migrate] Could not add {table_name}.{column.name}: {e}")
+
+
+# ----------------------------------------------------------------------
 # First-run seed
 # ----------------------------------------------------------------------
 def seed():
     db.create_all()
+    auto_migrate()
     if not User.query.filter_by(email="admin@riganest.com").first():
         a = User(name="RigaNest Admin", email="admin@riganest.com",
                  phone="+10000000000", is_admin=True)
