@@ -238,6 +238,7 @@ class Room(db.Model):
     features = db.Column(db.Text, default="{}")  # JSON: {"amenities": ["heating", ...], "kitchen": [...], ...}
     image = db.Column(db.String(255), default="")
     location = db.Column(db.String(200), default="")
+    beds24_room_id = db.Column(db.Integer, nullable=True)
     is_active = db.Column(db.Boolean, default=True)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     bookings = db.relationship("Booking", backref="room", cascade="all, delete-orphan")
@@ -298,6 +299,17 @@ class Booking(db.Model):
 
     def nights(self):
         return (self.check_out - self.check_in).days
+
+
+class RoomAvailability(db.Model):
+    """Per-date price/availability synced from Beds24. A row here
+    overrides Room.price and adds an extra availability check for
+    that specific room + date."""
+    id = db.Column(db.Integer, primary_key=True)
+    room_id = db.Column(db.Integer, db.ForeignKey("room.id"), nullable=False)
+    date = db.Column(db.Date, nullable=False)
+    price = db.Column(db.Float, nullable=True)
+    available = db.Column(db.Boolean, default=True)
 
 
 class RoomImage(db.Model):
@@ -443,7 +455,39 @@ def is_available(room_id, ci, co, exclude=None):
     )
     if exclude:
         q = q.filter(Booking.id != exclude)
-    return q.first() is None
+    if q.first() is not None:
+        return False
+
+    blocked = RoomAvailability.query.filter(
+        RoomAvailability.room_id == room_id,
+        RoomAvailability.date >= ci,
+        RoomAvailability.date < co,
+        RoomAvailability.available.is_(False),
+    ).first()
+    return blocked is None
+
+
+def calc_total_price(room, ci, co):
+    """Use Beds24-synced per-night prices if we have them for every
+    night of the stay; otherwise fall back to the flat room price."""
+    rows = {
+        r.date: r.price
+        for r in RoomAvailability.query.filter(
+            RoomAvailability.room_id == room.id,
+            RoomAvailability.date >= ci,
+            RoomAvailability.date < co,
+            RoomAvailability.price.isnot(None),
+        ).all()
+    }
+    nights = (co - ci).days
+    if not rows:
+        return nights * room.price
+    total = 0.0
+    d = ci
+    while d < co:
+        total += rows.get(d, room.price)
+        d += timedelta(days=1)
+    return total
 
 
 def send_otp(user):
@@ -868,7 +912,8 @@ def booking(room_id):
         else:
             nights = (co - ci).days
             bk = Booking(user_id=current_user.id, room_id=room.id, check_in=ci,
-                         check_out=co, guests=guests, total_price=nights * room.price)
+                         check_out=co, guests=guests,
+                         total_price=calc_total_price(room, ci, co))
             db.session.add(bk)
             db.session.commit()
             return redirect(url_for("checkout", booking_id=bk.id))
