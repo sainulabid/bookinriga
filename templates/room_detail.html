@@ -333,6 +333,27 @@
     });
   })();
 
+  // Redirect "Book Now" to Beds24 booking engine (Stripe handled on Beds24 side)
+  (function () {
+    const form = document.getElementById('inlineBookForm');
+    if (!form) return;
+    form.addEventListener('submit', function (e) {
+      e.preventDefault();
+      const checkin = document.getElementById('ib_check_in').value;
+      const checkout = document.getElementById('ib_check_out').value;
+      const guestsSelect = form.querySelector('select[name="guests"]');
+      const guests = guestsSelect ? guestsSelect.value : 1;
+
+      const propId = '64076';
+      let url = 'https://beds24.com/booking2.php?propid=' + propId;
+      if (checkin) url += '&checkin=' + checkin;
+      if (checkout) url += '&checkout=' + checkout;
+      if (guests) url += '&numadult=' + guests;
+
+      window.location.href = url;
+    });
+  })();
+
   // Photo slideshow
   var slides=document.querySelectorAll('#slider .detail-slide');
   var thumbs=document.querySelectorAll('#thumbs .detail-thumb');
