@@ -991,6 +991,12 @@ def booking_cancel(booking_id):
     return redirect(url_for("room_detail", room_id=bk.room_id))
 
 
+@app.route("/webhook/beds24-booking", methods=["POST"])
+def beds24_booking_webhook():
+    from beds24_webhook import handle_webhook
+    return handle_webhook()
+
+
 @app.route("/dashboard")
 @login_required
 def dashboard():
