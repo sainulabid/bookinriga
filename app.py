@@ -24,6 +24,7 @@ import smtplib
 import requests
 from email.mime.text import MIMEText
 from datetime import datetime, date, timedelta
+import secrets
 from functools import wraps
 
 from flask import (
@@ -296,6 +297,7 @@ class Booking(db.Model):
     payment_status = db.Column(db.String(40), default="Unpaid")
     stripe_session_id = db.Column(db.String(255), default="")
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    beds24_booking_id = db.Column(db.Integer, nullable=True)
 
     def nights(self):
         return (self.check_out - self.check_in).days
@@ -954,6 +956,93 @@ def checkout(booking_id):
                            publishable_key=STRIPE_PUBLISHABLE_KEY)
 
 
+@app.route("/beds24-return")
+def beds24_return():
+    """
+    Beds24's booking engine redirects the guest here after a booking is
+    made (SETTINGS > BOOKING ENGINE > PROPERTY BOOKING PAGE > BEHAVIOUR
+    > Booking Return URL must be set to this route's full URL).
+
+    Beds24 appends the booking details as query parameters. We use them
+    to: 1) record the booking in our own database so it shows on the
+    guest's dashboard and in /admin/bookings, and 2) immediately mark
+    those dates unavailable in RoomAvailability so our own site's
+    calendar reflects it right away, without waiting for the next
+    scheduled beds24_sync.py run.
+    """
+    bookid = request.args.get("bookid")
+    roomid = request.args.get("roomid", type=int)
+
+    if not bookid or not roomid:
+        flash("Booking confirmation link is missing some details. If you completed a payment, contact us to confirm.", "info")
+        return redirect(url_for("index"))
+
+    # Avoid creating a duplicate local booking if this page is reloaded/revisited
+    existing = Booking.query.filter_by(beds24_booking_id=bookid).first()
+    if existing:
+        return redirect(url_for("booking_success", booking_id=existing.id))
+
+    room = Room.query.filter_by(beds24_room_id=roomid).first()
+    if not room:
+        flash("Your Beds24 booking is confirmed, but we couldn't automatically match it to a room on our site. Contact us if anything looks wrong.", "info")
+        return redirect(url_for("index"))
+
+    ci = parse_date(request.args.get("firstnight"))
+    co = parse_date(request.args.get("checkout"))
+    if not co:
+        last = parse_date(request.args.get("lastnight"))
+        if last:
+            co = last + timedelta(days=1)
+    if not ci or not co:
+        flash("Your Beds24 booking is confirmed! We couldn't read the exact dates here, but your booking stands.", "success")
+        return redirect(url_for("index"))
+
+    guests = request.args.get("numadult", 1, type=int)
+    try:
+        price = float(request.args.get("price", 0) or 0)
+    except ValueError:
+        price = 0.0
+    email = (request.args.get("guestemail") or "").strip()
+    first_name = (request.args.get("guestfirstname") or "Guest").strip()
+    last_name = (request.args.get("guestname") or "").strip()
+
+    user = current_user._get_current_object() if current_user.is_authenticated else None
+    if not user and email:
+        user = User.query.filter_by(email=email).first()
+        if not user:
+            user = User(name=(first_name + " " + last_name).strip() or "Guest",
+                        email=email, phone="",
+                        password_hash=generate_password_hash(secrets.token_hex(16)))
+            db.session.add(user)
+            db.session.commit()
+
+    if not user:
+        flash("Your booking on Beds24 is confirmed! Sign in or contact us to link it to your RigaNest account.", "success")
+        return redirect(url_for("index"))
+
+    bk = Booking(user_id=user.id, room_id=room.id, check_in=ci, check_out=co,
+                 guests=guests, total_price=price, status="Confirmed",
+                 payment_status="Paid", beds24_booking_id=bookid)
+    db.session.add(bk)
+    db.session.commit()
+
+    d = ci
+    while d < co:
+        row = RoomAvailability.query.filter_by(room_id=room.id, date=d).first()
+        if not row:
+            row = RoomAvailability(room_id=room.id, date=d)
+            db.session.add(row)
+        row.available = False
+        d += timedelta(days=1)
+    db.session.commit()
+
+    if not current_user.is_authenticated:
+        login_user(user)
+
+    flash("Your booking is confirmed!", "success")
+    return redirect(url_for("booking_success", booking_id=bk.id))
+
+
 @app.route("/booking/<int:booking_id>/success")
 @login_required
 def booking_success(booking_id):
@@ -964,16 +1053,15 @@ def booking_success(booking_id):
     bk.payment_status = "Paid"
     db.session.commit()
 
-    # Push to Beds24 so the room is blocked there too (prevents double-booking
-    # with Airbnb/Booking.com/etc). If this fails, the local booking still
-    # stands — check server logs and push manually if needed.
-    try:
-        from beds24_push_booking import push_booking
-        ok, detail = push_booking(bk)
-        if not ok:
-            app.logger.warning(f"Beds24 push failed for booking {bk.id}: {detail}")
-    except Exception as e:
-        app.logger.warning(f"Beds24 push crashed for booking {bk.id}: {e}")
+    if not bk.beds24_booking_id:
+        try:
+            from beds24_booking import push_booking
+            new_id = push_booking(bk)
+            if new_id:
+                bk.beds24_booking_id = new_id
+                db.session.commit()
+        except Exception as e:
+            print(f"[beds24] Could not push booking #{bk.id}: {e}")
 
     return render_template("booking_success.html", booking=bk)
 
@@ -991,12 +1079,6 @@ def booking_cancel(booking_id):
     return redirect(url_for("room_detail", room_id=bk.room_id))
 
 
-@app.route("/webhook/beds24-booking", methods=["POST"])
-def beds24_booking_webhook():
-    from beds24_webhook import handle_webhook
-    return handle_webhook()
-
-
 @app.route("/dashboard")
 @login_required
 def dashboard():
@@ -1012,6 +1094,14 @@ def cancel_confirmed(booking_id):
         abort(403)
     bk.status = "Cancelled"
     db.session.commit()
+
+    if bk.beds24_booking_id:
+        try:
+            from beds24_booking import cancel_booking
+            cancel_booking(bk)
+        except Exception as e:
+            print(f"[beds24] Could not cancel booking #{bk.id}: {e}")
+
     flash("Booking cancelled.", "success")
     return redirect(request.referrer or url_for("dashboard"))
 

@@ -344,11 +344,14 @@
       const guestsSelect = form.querySelector('select[name="guests"]');
       const guests = guestsSelect ? guestsSelect.value : 1;
 
-      const propId = '64076';
+      const propId = '341384';
+      const roomId = '{{ room.beds24_room_id or "" }}';
       let url = 'https://beds24.com/booking2.php?propid=' + propId;
+      if (roomId) url += '&roomid=' + roomId;
       if (checkin) url += '&checkin=' + checkin;
       if (checkout) url += '&checkout=' + checkout;
       if (guests) url += '&numadult=' + guests;
+      url += '&referer=riganest';
 
       window.location.href = url;
     });
