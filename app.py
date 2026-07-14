@@ -963,6 +963,18 @@ def booking_success(booking_id):
     bk.status = "Confirmed"
     bk.payment_status = "Paid"
     db.session.commit()
+
+    # Push to Beds24 so the room is blocked there too (prevents double-booking
+    # with Airbnb/Booking.com/etc). If this fails, the local booking still
+    # stands — check server logs and push manually if needed.
+    try:
+        from beds24_push_booking import push_booking
+        ok, detail = push_booking(bk)
+        if not ok:
+            app.logger.warning(f"Beds24 push failed for booking {bk.id}: {detail}")
+    except Exception as e:
+        app.logger.warning(f"Beds24 push crashed for booking {bk.id}: {e}")
+
     return render_template("booking_success.html", booking=bk)
 
 
