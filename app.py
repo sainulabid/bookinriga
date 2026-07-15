@@ -240,6 +240,7 @@ class Room(db.Model):
     image = db.Column(db.String(255), default="")
     location = db.Column(db.String(200), default="")
     beds24_room_id = db.Column(db.Integer, nullable=True)
+    beds24_property_id = db.Column(db.Integer, nullable=True)
     is_active = db.Column(db.Boolean, default=True)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     bookings = db.relationship("Booking", backref="room", cascade="all, delete-orphan")
