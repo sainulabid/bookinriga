@@ -1109,6 +1109,26 @@ def cancel_confirmed(booking_id):
 # ----------------------------------------------------------------------
 # Admin
 # ----------------------------------------------------------------------
+@app.route("/admin/beds24-debug")
+@admin_required
+def admin_beds24_debug():
+    """
+    Read-only debug page (no Render Shell needed on the free tier).
+    Shows exactly what the LIVE production database currently has
+    stored for each room's beds24_room_id, so we can compare it
+    against Beds24's room list and find/remove duplicates.
+    """
+    rooms = Room.query.order_by(Room.id).all()
+    return {
+        "total_rooms": len(rooms),
+        "mapped": sum(1 for r in rooms if r.beds24_room_id),
+        "rooms": [
+            {"local_id": r.id, "name": r.name, "beds24_room_id": r.beds24_room_id}
+            for r in rooms
+        ],
+    }
+
+
 @app.route("/admin")
 @admin_required
 def admin_dashboard():
