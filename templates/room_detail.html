@@ -344,8 +344,12 @@
       const guestsSelect = form.querySelector('select[name="guests"]');
       const guests = guestsSelect ? guestsSelect.value : 1;
 
-      const propId = '341384';
+      const propId = '{{ room.beds24_property_id or "" }}';
       const roomId = '{{ room.beds24_room_id or "" }}';
+      if (!propId) {
+        alert('{% if lang=="lv" %}Šai istabai nav pieejama tiešsaistes rezervācija. Lūdzu, sazinieties ar mums.{% else %}Online booking is not available for this room yet. Please contact us.{% endif %}');
+        return;
+      }
       let url = 'https://beds24.com/booking2.php?propid=' + propId;
       if (roomId) url += '&roomid=' + roomId;
       if (checkin) url += '&checkin=' + checkin;
