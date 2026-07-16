@@ -670,6 +670,26 @@ def room_detail(room_id):
     room = Room.query.get_or_404(room_id)
     booked = [{"from": b.check_in.isoformat(), "to": b.check_out.isoformat()}
               for b in room.bookings if b.status in ("Confirmed", "Pending")]
+
+    # Also block out dates Beds24 says are unavailable (synced via beds24_sync.py
+    # into RoomAvailability), so the calendar reflects real-world bookings made
+    # through other channels (Airbnb, Booking.com, etc.), not just our own site.
+    blocked_dates = [
+        r.date for r in RoomAvailability.query.filter(
+            RoomAvailability.room_id == room.id,
+            RoomAvailability.available.is_(False),
+        ).order_by(RoomAvailability.date).all()
+    ]
+    if blocked_dates:
+        start = prev = blocked_dates[0]
+        for d in blocked_dates[1:]:
+            if (d - prev).days == 1:
+                prev = d
+                continue
+            booked.append({"from": start.isoformat(), "to": (prev + timedelta(days=1)).isoformat()})
+            start = prev = d
+        booked.append({"from": start.isoformat(), "to": (prev + timedelta(days=1)).isoformat()})
+
     photos = room.photo_urls()
 
     related = Room.query.filter(
