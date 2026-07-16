@@ -42,7 +42,14 @@ def get_access_token():
 
 
 def fetch_calendar(access_token, room_id, start_date, end_date):
-    """Returns list of {'from':date, 'to':date, 'price1':float} ranges."""
+    """Returns list of {'from':date, 'to':date, 'price1':float} ranges.
+
+    IMPORTANT FIX: Beds24 API v2 does NOT return price data from
+    /inventory/rooms/calendar unless you explicitly ask for it with
+    includePrices=true. Without this param, the availability/numAvail
+    part comes back fine but every price field is missing — which is
+    exactly why the calendar looked "ready" while prices stayed empty.
+    """
     resp = requests.get(
         f"{API_BASE}/inventory/rooms/calendar",
         headers={"accept": "application/json", "token": access_token},
@@ -50,6 +57,8 @@ def fetch_calendar(access_token, room_id, start_date, end_date):
             "roomId": room_id,
             "startDate": start_date.isoformat(),
             "endDate": end_date.isoformat(),
+            "includePrices": "true",
+            "includeNumAvail": "true",
         },
         timeout=30,
     )
@@ -57,7 +66,16 @@ def fetch_calendar(access_token, room_id, start_date, end_date):
     if resp.status_code != 200 or not data.get("data"):
         print(f"  [warn] calendar fetch failed for room {room_id}: {data}")
         return []
-    return data["data"][0].get("calendar", [])
+
+    calendar = data["data"][0].get("calendar", [])
+    if calendar:
+        # One-time debug print so we can confirm the actual field name
+        # Beds24 sends the price back as for this account (usually
+        # price1, but some accounts/plans use a different key).
+        print(f"  [debug] room {room_id} sample calendar entry: {calendar[0]}")
+    else:
+        print(f"  [debug] room {room_id}: empty calendar array returned")
+    return calendar
 
 
 def fetch_availability(access_token, room_id, start_date, end_date):
@@ -79,6 +97,16 @@ def fetch_availability(access_token, room_id, start_date, end_date):
     return data["data"][0].get("availability", {})
 
 
+def _extract_price(rng):
+    """Beds24 accounts can label the first price tier differently
+    depending on plan/settings. Try the common variants in order
+    instead of only ever looking for 'price1'."""
+    for key in ("price1", "rate1", "price", "roomRate", "rate"):
+        if rng.get(key) is not None:
+            return rng.get(key)
+    return None
+
+
 def expand_calendar_to_daily_price(calendar_ranges, start_date, end_date):
     """Turn [{'from','to','price1'}, ...] ranges into {date: price}."""
     daily = {}
@@ -86,7 +114,7 @@ def expand_calendar_to_daily_price(calendar_ranges, start_date, end_date):
         try:
             rfrom = date.fromisoformat(rng["from"])
             rto = date.fromisoformat(rng["to"])
-            price = rng.get("price1")
+            price = _extract_price(rng)
         except (KeyError, ValueError):
             continue
         d = max(rfrom, start_date)
@@ -109,6 +137,10 @@ def sync_room(access_token, room):
     if not daily_prices and not availability:
         print(f"  [skip] no data returned for room {room.id} ({room.name})")
         return 0
+
+    if not daily_prices:
+        print(f"  [warn] room {room.id} ({room.name}): availability synced but NO prices found. "
+              f"Check the [debug] sample entry above for the real price field name.")
 
     existing = {
         r.date: r
