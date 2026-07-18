@@ -88,25 +88,6 @@ def fetch_calendar(access_token, room_id, start_date, end_date):
     return calendar
 
 
-def fetch_availability(access_token, room_id, start_date, end_date):
-    """Returns dict {date_str: bool}."""
-    resp = requests.get(
-        f"{API_BASE}/inventory/rooms/availability",
-        headers={"accept": "application/json", "token": access_token},
-        params={
-            "roomId": room_id,
-            "startDate": start_date.isoformat(),
-            "endDate": end_date.isoformat(),
-        },
-        timeout=30,
-    )
-    data = resp.json()
-    if resp.status_code != 200 or not data.get("data"):
-        print(f"  [warn] availability fetch failed for room {room_id}: {data}")
-        return {}
-    return data["data"][0].get("availability", {})
-
-
 def _extract_price(rng):
     """Beds24 accounts can label the first price tier differently
     depending on plan/settings. Try the common variants in order
@@ -117,8 +98,19 @@ def _extract_price(rng):
     return None
 
 
-def expand_calendar_to_daily_price(calendar_ranges, start_date, end_date):
-    """Turn [{'from','to','price1'}, ...] ranges into {date: price}."""
+def expand_calendar(calendar_ranges, start_date, end_date):
+    """Turn [{'from','to','price1','numAvail'}, ...] ranges into
+    {date: (price, available)}.
+
+    IMPORTANT: this used to require a SEPARATE call to
+    /inventory/rooms/availability for the available/blocked flag. But
+    the calendar endpoint already returns numAvail per range when we
+    ask for it (includeNumAvail=true) — so we derive availability from
+    numAvail > 0 here instead, cutting API calls per room from 2 to 1.
+    This matters a lot on accounts with a tight Beds24 API credit
+    limit: with 35+ rooms, 2 calls/room was hitting 'Credit limit
+    exceeded' (429) partway through every sync.
+    """
     daily = {}
     for rng in calendar_ranges:
         try:
@@ -127,11 +119,12 @@ def expand_calendar_to_daily_price(calendar_ranges, start_date, end_date):
             price = _extract_price(rng)
         except (KeyError, ValueError):
             continue
+        num_avail = rng.get("numAvail")
+        available = True if num_avail is None else (num_avail > 0)
         d = max(rfrom, start_date)
         last = min(rto, end_date)
         while d <= last:
-            if price is not None:
-                daily[d] = price
+            daily[d] = (price, available)
             d += timedelta(days=1)
     return daily
 
@@ -141,14 +134,13 @@ def sync_room(access_token, room):
     end_date = start_date + timedelta(days=SYNC_DAYS_AHEAD)
 
     calendar = fetch_calendar(access_token, room.beds24_room_id, start_date, end_date)
-    availability = fetch_availability(access_token, room.beds24_room_id, start_date, end_date)
-    daily_prices = expand_calendar_to_daily_price(calendar, start_date, end_date)
+    daily = expand_calendar(calendar, start_date, end_date)
 
-    if not daily_prices and not availability:
+    if not daily:
         print(f"  [skip] no data returned for room {room.id} ({room.name})")
         return 0
 
-    if not daily_prices:
+    if not any(price is not None for price, _avail in daily.values()):
         print(f"  [warn] room {room.id} ({room.name}): availability synced but NO prices found. "
               f"Check the [debug] sample entry above for the real price field name.")
 
@@ -161,19 +153,14 @@ def sync_room(access_token, room):
         ).all()
     }
 
-    all_dates = set(daily_prices.keys()) | {
-        date.fromisoformat(k) for k in availability.keys()
-    }
-
     written = 0
     lowest_price = None
     d = start_date
     while d <= end_date:
-        if d not in all_dates:
+        if d not in daily:
             d += timedelta(days=1)
             continue
-        price = daily_prices.get(d)
-        avail = availability.get(d.isoformat(), True)
+        price, avail = daily[d]
         if price is not None and avail and (lowest_price is None or price < lowest_price):
             lowest_price = price
 
