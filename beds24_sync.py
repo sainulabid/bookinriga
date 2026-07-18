@@ -23,7 +23,17 @@ import requests
 
 from app import app, db, Room, RoomAvailability
 
-BEDS24_REFRESH_TOKEN = os.environ.get("BEDS24_REFRESH_TOKEN", "")
+def _clean_env(value):
+    """Defensively clean an env var value: if it accidentally contains
+    a newline (e.g. from pasting 'TOKEN\\nOTHER_KEY=value' into a single
+    Render env var box), keep only the first line, and strip stray
+    whitespace/quotes."""
+    if not value:
+        return value
+    return value.split("\n")[0].split("\r")[0].strip().strip('"').strip("'")
+
+
+BEDS24_REFRESH_TOKEN = _clean_env(os.environ.get("BEDS24_REFRESH_TOKEN", ""))
 SYNC_DAYS_AHEAD = int(os.environ.get("BEDS24_SYNC_DAYS", "365"))
 
 API_BASE = "https://beds24.com/api/v2"
