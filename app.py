@@ -1150,6 +1150,71 @@ def admin_beds24_debug():
     }
 
 
+@app.route("/admin/beds24-price-debug")
+@admin_required
+def admin_beds24_price_debug():
+    """
+    Shows exactly what the LIVE production database currently has for
+    Room.price and the next 7 days of RoomAvailability price/available
+    rows, per room. Use this to check whether prices actually made it
+    into the production DB (as opposed to only a local copy), and
+    whether the values look right.
+    """
+    today = date.today()
+    result = []
+    for r in Room.query.order_by(Room.id).all():
+        rows = (
+            RoomAvailability.query.filter(
+                RoomAvailability.room_id == r.id,
+                RoomAvailability.date >= today,
+            )
+            .order_by(RoomAvailability.date)
+            .limit(7)
+            .all()
+        )
+        result.append({
+            "room_id": r.id,
+            "name": r.name,
+            "beds24_room_id": r.beds24_room_id,
+            "room_price_field": r.price,
+            "next_7_days": [
+                {"date": row.date.isoformat(), "price": row.price, "available": row.available}
+                for row in rows
+            ],
+            "total_availability_rows": RoomAvailability.query.filter_by(room_id=r.id).count(),
+        })
+    return {"today": today.isoformat(), "rooms": result}
+
+
+@app.route("/admin/run-beds24-sync")
+@admin_required
+def admin_run_beds24_sync():
+    """
+    TEMPORARY debug/trigger route — lets us run beds24_sync.py from the
+    browser on Render plans where the Shell tab isn't available (Shell
+    requires upgrading the instance type, not just the account plan).
+
+    Visit this URL while logged in as an admin to run the sync once and
+    see its log output as JSON. Once syncing is confirmed working and a
+    proper scheduled job (Render Cron Job / background worker) is set
+    up to run beds24_sync.py automatically, this route can be removed.
+    """
+    import io
+    import contextlib
+    from beds24_sync import main as sync_main
+
+    buf = io.StringIO()
+    try:
+        with contextlib.redirect_stdout(buf):
+            sync_main()
+        status = "success"
+    except Exception as e:
+        buf.write(f"\nERROR: {e}")
+        status = "error"
+
+    return {"status": status, "log": buf.getvalue().splitlines()}
+
+
 @app.route("/admin")
 @admin_required
 def admin_dashboard():
