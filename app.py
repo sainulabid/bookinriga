@@ -1186,19 +1186,19 @@ def admin_beds24_price_debug():
     return {"today": today.isoformat(), "rooms": result}
 
 
-@app.route("/admin/run-beds24-sync")
-@admin_required
-def admin_run_beds24_sync():
-    """
-    TEMPORARY debug/trigger route — lets us run beds24_sync.py from the
-    browser on Render plans where the Shell tab isn't available (Shell
-    requires upgrading the instance type, not just the account plan).
+_beds24_sync_state = {"running": False, "status": "never_run", "log": [], "started_at": None, "finished_at": None}
+_beds24_sync_lock = None
 
-    Visit this URL while logged in as an admin to run the sync once and
-    see its log output as JSON. Once syncing is confirmed working and a
-    proper scheduled job (Render Cron Job / background worker) is set
-    up to run beds24_sync.py automatically, this route can be removed.
-    """
+
+def _get_sync_lock():
+    global _beds24_sync_lock
+    if _beds24_sync_lock is None:
+        import threading
+        _beds24_sync_lock = threading.Lock()
+    return _beds24_sync_lock
+
+
+def _run_beds24_sync_background():
     import io
     import contextlib
     from beds24_sync import main as sync_main
@@ -1207,12 +1207,69 @@ def admin_run_beds24_sync():
     try:
         with contextlib.redirect_stdout(buf):
             sync_main()
-        status = "success"
+        _beds24_sync_state["status"] = "success"
     except Exception as e:
         buf.write(f"\nERROR: {e}")
-        status = "error"
+        _beds24_sync_state["status"] = "error"
+    finally:
+        _beds24_sync_state["log"] = buf.getvalue().splitlines()
+        _beds24_sync_state["finished_at"] = datetime.utcnow().isoformat()
+        _beds24_sync_state["running"] = False
 
-    return {"status": status, "log": buf.getvalue().splitlines()}
+
+@app.route("/admin/run-beds24-sync")
+@admin_required
+def admin_run_beds24_sync():
+    """
+    TEMPORARY debug/trigger route — lets us run beds24_sync.py from the
+    browser on Render plans where the Shell tab isn't available.
+
+    IMPORTANT: this used to run the sync directly inside the web
+    request, which could take longer than gunicorn's worker timeout
+    (120s) on accounts with many rooms / a large BEDS24_SYNC_DAYS
+    window. When the worker got killed mid-request, it could leave the
+    shared DB connection in a broken state and take the WHOLE SITE
+    down (not just this route) until the service was restarted.
+
+    Fix: the sync now runs in a background thread. This request just
+    starts it and returns immediately. Check progress/result with
+    /admin/beds24-sync-status.
+
+    Once syncing is confirmed working and a proper scheduled job
+    (Render Cron Job) is set up to run beds24_sync.py automatically,
+    this route can be removed.
+    """
+    import threading
+
+    lock = _get_sync_lock()
+    if not lock.acquire(blocking=False):
+        return {"status": "already_running", "message": "A sync is already in progress. Check /admin/beds24-sync-status."}
+
+    def _target():
+        try:
+            _run_beds24_sync_background()
+        finally:
+            lock.release()
+
+    _beds24_sync_state["running"] = True
+    _beds24_sync_state["status"] = "running"
+    _beds24_sync_state["log"] = []
+    _beds24_sync_state["started_at"] = datetime.utcnow().isoformat()
+    _beds24_sync_state["finished_at"] = None
+
+    threading.Thread(target=_target, daemon=True).start()
+
+    return {
+        "status": "started",
+        "message": "Sync started in the background. Poll /admin/beds24-sync-status for progress/result.",
+    }
+
+
+@app.route("/admin/beds24-sync-status")
+@admin_required
+def admin_beds24_sync_status():
+    """Check on the background sync started by /admin/run-beds24-sync."""
+    return dict(_beds24_sync_state)
 
 
 @app.route("/admin")
