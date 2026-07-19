@@ -1272,6 +1272,39 @@ def admin_beds24_sync_status():
     return dict(_beds24_sync_state)
 
 
+@app.route("/admin/fix-beds24-room-id-mismatches")
+@admin_required
+def admin_fix_beds24_room_id_mismatches():
+    """
+    ONE-TIME FIX. Comparing our DB's beds24_room_id values against
+    Beds24's actual BookinRiga (property 341384) room list turned up 3
+    rooms pointing at the wrong Beds24 room id (stale from an earlier
+    mapping/cleanup pass) — which is why syncing them returned no price
+    data. This corrects those 3 by exact room name match. Safe to
+    re-run; it's a no-op once applied. Remove this route afterward.
+    """
+    fixes = {
+        "Kalnina Quiet Apartment in city center": 705436,
+        "Old Riga Smilsu street Quiet One Bedroom Apartment": 705446,
+        "Kalnina Street Modern Studio Apartment in Riga": 705450,
+    }
+    results = []
+    for name, correct_id in fixes.items():
+        room = Room.query.filter_by(name=name).first()
+        if not room:
+            results.append({"name": name, "status": "not_found_in_db"})
+            continue
+        old_id = room.beds24_room_id
+        if old_id == correct_id:
+            results.append({"name": name, "status": "already_correct", "beds24_room_id": correct_id})
+            continue
+        room.beds24_room_id = correct_id
+        results.append({"name": name, "status": "fixed", "old_beds24_room_id": old_id, "new_beds24_room_id": correct_id})
+
+    db.session.commit()
+    return {"results": results}
+
+
 @app.route("/admin")
 @admin_required
 def admin_dashboard():
