@@ -1305,6 +1305,129 @@ def admin_fix_beds24_room_id_mismatches():
     return {"results": results}
 
 
+@app.route("/admin/migrate-to-homestate-rooms")
+@admin_required
+def admin_migrate_to_homestate_rooms():
+    """
+    ONE-TIME MIGRATION. Switches the room catalog over from the
+    BookinRiga (property 341384) Beds24 listing — which turned out to
+    have no rate plans configured for many rooms — to the Homestate
+    account's individual per-apartment properties, which DO have real
+    rates. Source data: data/homestate_rooms.csv (80 rows), built
+    earlier from a Beds24 property/room discovery pass.
+
+    What this does, in order:
+      1. Deactivates the 13 local rooms that only ever existed under
+         BookinRiga (341384) and have no equivalent in the Homestate
+         list at all (is_active = False; not deleted, so existing
+         bookings referencing them stay intact).
+      2. For every row in the CSV: if a Room with that exact name
+         already exists, updates its beds24_room_id/property_id,
+         price, capacity, size, image, and reactivates it. If no Room
+         with that name exists, creates a new one.
+
+    Safe to re-run (idempotent) — matches by room name each time.
+    Remove this route once the migration is confirmed correct.
+    """
+    import csv as csv_module
+
+    csv_path = os.path.join(BASE_DIR, "data", "homestate_rooms.csv")
+    if not os.path.exists(csv_path):
+        return {"error": f"CSV not found at {csv_path}. Make sure data/homestate_rooms.csv was committed and deployed."}
+
+    # 1) Deactivate the 13 rooms with no Homestate equivalent at all.
+    no_homestate_match = [
+        "Riga City Center Apartment",
+        "Old Riga Cozy One Bedroom Apartment",
+        "Old Riga Terrace Apartment",
+        "Kalnina Quiet Apartment in city center",
+        "Old Riga Palasta Loft Apartment with river view",
+        "Kr. Barona iela 24/26 Residential Barona One Bedroom Apartment",
+        "Kr. Barona iela 24/26 One Bedroom Apartment",
+        "Modern Design Studio Apartment In Riga Center",
+        "Brīvības Yard Apartment With Parking In City Center",
+        "Riga Riverside Design One Bedroom Apartment",
+        "Kungu iela 25 Old Riga Ridzenes Residence Studio Apartment",
+        "Old Riga Kaleju Cozy apartment2",
+        "Old Riga 2 Bedroom Vecpilsetas street Apartment",
+    ]
+    deactivated = []
+    for name in no_homestate_match:
+        room = Room.query.filter(db.func.lower(Room.name) == name.strip().lower()).first()
+        if room:
+            room.is_active = False
+            deactivated.append(name)
+
+    # 2) Sync every Homestate CSV row into the Room table.
+    updated, created, skipped = [], [], []
+    with open(csv_path, encoding="utf-8-sig") as f:
+        reader = csv_module.DictReader(f)
+        for row in reader:
+            room_name = (row.get("room_name") or "").strip()
+            if not room_name:
+                continue
+
+            def _num(key, default=0):
+                try:
+                    return float(row.get(key) or default)
+                except ValueError:
+                    return default
+
+            beds24_room_id = int(row["room_id"]) if row.get("room_id") else None
+            beds24_property_id = int(row["property_id"]) if row.get("property_id") else None
+            price = _num("rack_rate") or _num("min_price") or 50
+            capacity = int(_num("max_people", 2)) or 2
+            size_sqm = int(_num("room_size_m2", 30)) or 30
+            location = ", ".join(x for x in [row.get("address", "").strip(), row.get("city", "").strip()] if x)
+            image_urls = [u.strip() for u in (row.get("image_url") or "").split(";") if u.strip()]
+            cover_image = image_urls[0] if image_urls else ""
+
+            existing = Room.query.filter(db.func.lower(Room.name) == room_name.lower()).first()
+            if existing:
+                existing.beds24_room_id = beds24_room_id
+                existing.beds24_property_id = beds24_property_id
+                existing.price = price
+                existing.capacity = capacity
+                existing.size_sqm = size_sqm
+                if location:
+                    existing.location = location
+                if cover_image and not existing.image:
+                    existing.image = cover_image
+                existing.is_active = True
+                updated.append(room_name)
+            else:
+                new_room = Room(
+                    name=room_name,
+                    room_type="Standard",
+                    description=(row.get("description") or "").strip(),
+                    price=price,
+                    capacity=capacity,
+                    beds=1,
+                    size_sqm=size_sqm,
+                    location=location,
+                    beds24_room_id=beds24_room_id,
+                    beds24_property_id=beds24_property_id,
+                    image=cover_image,
+                    is_active=True,
+                )
+                db.session.add(new_room)
+                db.session.flush()  # get new_room.id for RoomImage rows
+                for extra_url in image_urls[1:]:
+                    db.session.add(RoomImage(room_id=new_room.id, filename=extra_url))
+                created.append(room_name)
+
+    db.session.commit()
+
+    return {
+        "deactivated_no_homestate_match": deactivated,
+        "updated_count": len(updated),
+        "updated": updated,
+        "created_count": len(created),
+        "created": created,
+        "total_active_rooms_now": Room.query.filter_by(is_active=True).count(),
+    }
+
+
 @app.route("/admin")
 @admin_required
 def admin_dashboard():
