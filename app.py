@@ -1513,6 +1513,69 @@ def admin_cleanup_homestate_duplicates():
     }
 
 
+@app.route("/admin/fix-homestate-images")
+@admin_required
+def admin_fix_homestate_images():
+    """
+    ONE-TIME FIX, follow-up to /admin/migrate-to-homestate-rooms.
+
+    That migration only set a room's cover image if it didn't already
+    have one, and only added extra gallery photos for BRAND NEW rooms
+    — existing rooms kept whatever image they had before (often a
+    stale/duplicate one from earlier scripts) and never got the
+    Homestate gallery photos at all. This forces every room matched by
+    name in data/homestate_rooms.csv to take the CSV's image data as
+    the source of truth: cover image is overwritten, and old extra
+    RoomImage rows for that room are replaced with the CSV's list.
+
+    Only touches rooms whose CSV row actually has an image_url (52 of
+    80) — rooms with no image data in the CSV are left untouched so we
+    don't blank out something that was working.
+
+    Safe to re-run. Remove this route afterward.
+    """
+    import csv as csv_module
+
+    csv_path = os.path.join(BASE_DIR, "data", "homestate_rooms.csv")
+    if not os.path.exists(csv_path):
+        return {"error": f"CSV not found at {csv_path}."}
+
+    fixed, skipped_no_image, not_found = [], [], []
+
+    with open(csv_path, encoding="utf-8-sig") as f:
+        reader = csv_module.DictReader(f)
+        for row in reader:
+            room_name = (row.get("room_name") or "").strip()
+            if not room_name:
+                continue
+            image_urls = [u.strip() for u in (row.get("image_url") or "").split(";") if u.strip()]
+            if not image_urls:
+                skipped_no_image.append(room_name)
+                continue
+
+            room = Room.query.filter(db.func.lower(Room.name) == room_name.lower()).first()
+            if not room:
+                not_found.append(room_name)
+                continue
+
+            room.image = image_urls[0]
+            # Replace old extra photos for this room with the CSV's list
+            RoomImage.query.filter_by(room_id=room.id).delete()
+            for extra_url in image_urls[1:]:
+                db.session.add(RoomImage(room_id=room.id, filename=extra_url))
+            fixed.append({"name": room_name, "photo_count": len(image_urls)})
+
+    db.session.commit()
+
+    return {
+        "fixed_count": len(fixed),
+        "fixed": fixed,
+        "skipped_no_image_in_csv_count": len(skipped_no_image),
+        "skipped_no_image_in_csv": skipped_no_image,
+        "not_found_in_db": not_found,
+    }
+
+
 @app.route("/admin")
 @admin_required
 def admin_dashboard():
