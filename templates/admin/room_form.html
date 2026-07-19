@@ -19,6 +19,30 @@
         <div class="form-group"><label>Bathrooms *</label><input type="number" name="bathrooms" required min="1" value="{{ room.bathrooms if room else 1 }}"></div>
         <div class="form-group"><label>Size (m²)</label><input type="number" name="size_sqm" min="1" value="{{ room.size_sqm if room else 30 }}"></div>
       </div>
+
+      <!-- ROOM SPECIFICATIONS — shown on the public room page's "Room Specifications" card.
+           Defaults come from the Beds24 specs sync; saving this form locks these fields
+           (specs_manual_override) so future Beds24 syncs won't overwrite your edits. -->
+      <div class="form-group">
+        <label>Room Specifications</label>
+        <p style="font-size:12px;color:var(--gray-500);margin:-2px 0 14px">
+          {% if room and room.specs_manual_override %}
+            ✓ Manually set — Beds24 sync will not overwrite these.
+          {% else %}
+            Currently filled in from the Beds24 specs sync. Editing and saving locks them from future Beds24 overwrites.
+          {% endif %}
+        </p>
+        <div class="form-row-3" style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:14px">
+          <div class="form-group"><label>Bed Type</label><input type="text" name="bed_type" placeholder="Queen bed, Twin beds…" value="{{ room.bed_type if room else '' }}"></div>
+          <div class="form-group"><label>Max Adults</label><input type="number" name="max_adults" min="1" value="{{ room.max_adults if room else 2 }}"></div>
+          <div class="form-group"><label>Max Children</label><input type="number" name="max_children" min="0" value="{{ room.max_children if room else 0 }}"></div>
+        </div>
+        <div class="form-row" style="display:grid;grid-template-columns:1fr 1fr;gap:14px">
+          <div class="form-group"><label>Minimum Stay (nights)</label><input type="number" name="min_stay" min="1" value="{{ room.min_stay if room else 1 }}"></div>
+          <div class="form-group"><label>Maximum Stay (nights)</label><input type="number" name="max_stay" min="1" value="{{ room.max_stay if room else 365 }}"></div>
+        </div>
+      </div>
+
       <div class="form-group"><label>Amenities highlight (comma separated, shown on room cards)</label><input type="text" name="amenities" placeholder="Sea View, WiFi, Breakfast" value="{{ room.amenities if room else '' }}"></div>
 
       <div class="form-group">
