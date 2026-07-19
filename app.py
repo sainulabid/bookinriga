@@ -241,6 +241,15 @@ class Room(db.Model):
     location = db.Column(db.String(200), default="")
     beds24_room_id = db.Column(db.Integer, nullable=True)
     beds24_property_id = db.Column(db.Integer, nullable=True)
+    # Room Specifications — populated from Beds24 by default; if an
+    # admin edits them in the room form, specs_manual_override is set
+    # so future Beds24 syncs won't silently overwrite the admin's values.
+    bed_type = db.Column(db.String(80), default="")
+    max_adults = db.Column(db.Integer, default=2)
+    max_children = db.Column(db.Integer, default=0)
+    min_stay = db.Column(db.Integer, default=1)
+    max_stay = db.Column(db.Integer, default=365)
+    specs_manual_override = db.Column(db.Boolean, default=False)
     is_active = db.Column(db.Boolean, default=True)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     bookings = db.relationship("Booking", backref="room", cascade="all, delete-orphan")
@@ -563,6 +572,30 @@ def upload_image(obj, folder="riganest/rooms"):
             fn = f"{int(datetime.utcnow().timestamp())}_{secure_filename(f.filename)}"
             f.save(os.path.join(app.config["UPLOAD_FOLDER"], fn))
             obj.image = fn
+
+
+def _apply_room_specs_from_form(room, form):
+    """
+    Reads the Room Specifications fields (bed type, adults, children,
+    min/max stay) from the admin room form, if present, and applies
+    them. Submitting this form is treated as an explicit admin
+    override: specs_manual_override is set to True so future Beds24
+    syncs (which only fill in specs when specs_manual_override is
+    False) won't silently replace what the admin just set.
+
+    The 'specs_source' hidden field lets the form distinguish "admin
+    actively edited specs" from "form re-submitted without touching
+    specs" — only set it to 'manual' from the template when specs
+    inputs are shown/editable.
+    """
+    if "bed_type" not in form and "max_adults" not in form:
+        return  # template doesn't have these fields yet; nothing to do
+    room.bed_type = form.get("bed_type", room.bed_type or "").strip()
+    room.max_adults = form.get("max_adults", room.max_adults or 2, type=int)
+    room.max_children = form.get("max_children", room.max_children or 0, type=int)
+    room.min_stay = form.get("min_stay", room.min_stay or 1, type=int)
+    room.max_stay = form.get("max_stay", room.max_stay or 365, type=int)
+    room.specs_manual_override = True
 
 
 def save_room_features(room, form):
@@ -1576,6 +1609,69 @@ def admin_fix_homestate_images():
     }
 
 
+_beds24_specs_sync_state = {"running": False, "status": "never_run", "log": [], "started_at": None, "finished_at": None}
+_beds24_specs_sync_lock = None
+
+
+def _get_specs_sync_lock():
+    global _beds24_specs_sync_lock
+    if _beds24_specs_sync_lock is None:
+        import threading
+        _beds24_specs_sync_lock = threading.Lock()
+    return _beds24_specs_sync_lock
+
+
+@app.route("/admin/run-beds24-specs-sync")
+@admin_required
+def admin_run_beds24_specs_sync():
+    """
+    Triggers the SEPARATE room-specs sync (bed type, max adults/
+    children, min/max stay) — kept apart from the every-30-min price
+    sync since specs rarely change and this adds one more API call per
+    room, which matters on a tight Beds24 credit limit. Runs in a
+    background thread like /admin/run-beds24-sync. Check progress at
+    /admin/beds24-specs-sync-status.
+    """
+    import io
+    import contextlib
+    import threading
+    from beds24_sync import main_specs as sync_specs_main
+
+    lock = _get_specs_sync_lock()
+    if not lock.acquire(blocking=False):
+        return {"status": "already_running", "message": "A specs sync is already in progress. Check /admin/beds24-specs-sync-status."}
+
+    def _target():
+        buf = io.StringIO()
+        try:
+            with contextlib.redirect_stdout(buf):
+                sync_specs_main()
+            _beds24_specs_sync_state["status"] = "success"
+        except Exception as e:
+            buf.write(f"\nERROR: {e}")
+            _beds24_specs_sync_state["status"] = "error"
+        finally:
+            _beds24_specs_sync_state["log"] = buf.getvalue().splitlines()
+            _beds24_specs_sync_state["finished_at"] = datetime.utcnow().isoformat()
+            _beds24_specs_sync_state["running"] = False
+            lock.release()
+
+    _beds24_specs_sync_state["running"] = True
+    _beds24_specs_sync_state["status"] = "running"
+    _beds24_specs_sync_state["log"] = []
+    _beds24_specs_sync_state["started_at"] = datetime.utcnow().isoformat()
+    _beds24_specs_sync_state["finished_at"] = None
+
+    threading.Thread(target=_target, daemon=True).start()
+    return {"status": "started", "message": "Specs sync started. Poll /admin/beds24-specs-sync-status for progress/result."}
+
+
+@app.route("/admin/beds24-specs-sync-status")
+@admin_required
+def admin_beds24_specs_sync_status():
+    return dict(_beds24_specs_sync_state)
+
+
 @app.route("/admin")
 @admin_required
 def admin_dashboard():
@@ -1615,6 +1711,7 @@ def admin_add_room():
             location=request.form.get("location", "").strip(),
             is_active=bool(request.form.get("is_active")),
         )
+        _apply_room_specs_from_form(r, request.form)
         save_room_features(r, request.form)
         upload_image(r, folder="riganest/rooms")
         db.session.add(r)
@@ -1642,6 +1739,7 @@ def admin_edit_room(room_id):
         r.amenities = request.form.get("amenities", "").strip()
         r.location = request.form.get("location", "").strip()
         r.is_active = bool(request.form.get("is_active"))
+        _apply_room_specs_from_form(r, request.form)
         save_room_features(r, request.form)
         upload_image(r, folder="riganest/rooms")
         upload_extra_photos(r)

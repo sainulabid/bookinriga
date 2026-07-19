@@ -39,6 +39,86 @@ SYNC_DAYS_AHEAD = int(os.environ.get("BEDS24_SYNC_DAYS", "365"))
 API_BASE = "https://beds24.com/api/v2"
 
 
+def fetch_room_specs(access_token, room_id):
+    """
+    Fetches room-level details (not date-specific) from Beds24:
+    max adults/children, min/max stay length, unit type. Kept as a
+    SEPARATE function/sync from the price+calendar sync above — specs
+    rarely change, so this is meant to be run occasionally (manually,
+    via /admin/run-beds24-specs-sync), not every 30 minutes, to avoid
+    burning through the account's API credit limit.
+
+    Beds24 v2's exact field names for /inventory/rooms aren't fully
+    confirmed for this account yet, so this prints the raw response
+    for the first room so we can see what's actually available and
+    adjust the extraction if needed.
+    """
+    resp = requests.get(
+        f"{API_BASE}/inventory/rooms",
+        headers={"accept": "application/json", "token": access_token},
+        params={"roomId": room_id},
+        timeout=30,
+    )
+    data = resp.json()
+    if resp.status_code != 200 or not data.get("data"):
+        print(f"  [warn] room-details fetch failed for room {room_id}: {data}")
+        return None
+
+    info = data["data"][0]
+    print(f"  [debug] room {room_id} raw room-details: {info}")
+    return info
+
+
+def _first_present(d, keys, default=None):
+    for k in keys:
+        if d.get(k) is not None:
+            return d.get(k)
+    return default
+
+
+def sync_room_specs(access_token, room):
+    """Updates Room.bed_type/max_adults/max_children/min_stay/max_stay
+    from Beds24, UNLESS the admin has manually overridden them
+    (room.specs_manual_override)."""
+    if room.specs_manual_override:
+        print(f"  [skip] room {room.id} ({room.name}): specs manually overridden by admin, not touching")
+        return False
+
+    info = fetch_room_specs(access_token, room.beds24_room_id)
+    if not info:
+        return False
+
+    room.bed_type = _first_present(info, ["unitType", "roomType", "type"], room.bed_type or "")
+    room.max_adults = int(_first_present(info, ["maxAdult", "maxAdults"], room.max_adults or 2))
+    room.max_children = int(_first_present(info, ["maxChildren", "maxChild"], room.max_children or 0))
+    room.min_stay = int(_first_present(info, ["minStay", "minPeriod"], room.min_stay or 1))
+    room.max_stay = int(_first_present(info, ["maxStay", "maxPeriod"], room.max_stay or 365))
+    db.session.commit()
+    return True
+
+
+def main_specs():
+    """Entry point for the separate, occasional specs sync."""
+    if not BEDS24_REFRESH_TOKEN:
+        print("ERROR: BEDS24_REFRESH_TOKEN environment variable is not set.")
+        sys.exit(1)
+
+    with app.app_context():
+        access_token = get_access_token()
+        rooms = Room.query.filter(Room.beds24_room_id.isnot(None)).all()
+        if not rooms:
+            print("No rooms have a beds24_room_id set yet.")
+            return
+
+        print(f"Syncing specs for {len(rooms)} room(s)...")
+        updated = 0
+        for room in rooms:
+            print(f"- Room #{room.id} ({room.name}) <- Beds24 room {room.beds24_room_id}")
+            if sync_room_specs(access_token, room):
+                updated += 1
+        print(f"Done. Specs updated for {updated}/{len(rooms)} room(s).")
+
+
 def get_access_token():
     resp = requests.get(
         f"{API_BASE}/authentication/token",

@@ -1,8 +1,5 @@
 {% extends "base.html" %}
 {% block title %}{{ room.name }} — RigaNest{% endblock %}
-{% block head %}
-<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css">
-{% endblock %}
 
 {% block content %}
 <div class="page page-wrap">
@@ -49,7 +46,63 @@
           <p style="margin-top:18px;color:var(--gray-700);line-height:1.8">{{ room.description }}</p>
         </div>
 
-        <!-- AVAILABILITY CALENDAR -->
+        <!-- ROOM SPECIFICATIONS -->
+        <div class="room-specs-section">
+          <h3 class="room-specs-title">{% if lang=='lv' %}Istabas specifikācija{% else %}Room Specifications{% endif %}</h3>
+          <div class="room-specs-grid">
+            <div class="room-spec-card">
+              <span class="room-spec-icon">🛏️</span>
+              <div>
+                <div class="room-spec-label">{% if lang=='lv' %}Gultas veids{% else %}Bed Type{% endif %}</div>
+                <div class="room-spec-value">{{ room.bed_type if room.bed_type else (room.room_type or (('Istaba' if lang=='lv' else 'Room'))) }}</div>
+              </div>
+            </div>
+            <div class="room-spec-card">
+              <span class="room-spec-icon">📐</span>
+              <div>
+                <div class="room-spec-label">{% if lang=='lv' %}Istabas izmērs{% else %}Room Size{% endif %}</div>
+                <div class="room-spec-value">{{ '%.2f'|format(room.size_sqm) }} m²</div>
+              </div>
+            </div>
+            <div class="room-spec-card">
+              <span class="room-spec-icon">👥</span>
+              <div>
+                <div class="room-spec-label">{% if lang=='lv' %}Maks. viesu skaits{% else %}Max Occupancy{% endif %}</div>
+                <div class="room-spec-value">{{ room.capacity }} {% if lang=='lv' %}cilvēki{% else %}people{% endif %}</div>
+              </div>
+            </div>
+            <div class="room-spec-card">
+              <span class="room-spec-icon">🧑</span>
+              <div>
+                <div class="room-spec-label">{% if lang=='lv' %}Pieaugušie{% else %}Adults{% endif %}</div>
+                <div class="room-spec-value">{{ room.max_adults or room.capacity }} {% if lang=='lv' %}pieaugušie{% else %}adults{% endif %}</div>
+              </div>
+            </div>
+            <div class="room-spec-card">
+              <span class="room-spec-icon">🧒</span>
+              <div>
+                <div class="room-spec-label">{% if lang=='lv' %}Bērni{% else %}Children{% endif %}</div>
+                <div class="room-spec-value">{{ room.max_children or 0 }} {% if lang=='lv' %}bērni{% else %}children{% endif %}</div>
+              </div>
+            </div>
+            <div class="room-spec-card">
+              <span class="room-spec-icon">📅</span>
+              <div>
+                <div class="room-spec-label">{% if lang=='lv' %}Minimālais uzturēšanās laiks{% else %}Minimum Stay{% endif %}</div>
+                <div class="room-spec-value">{{ room.min_stay or 1 }} {% if lang=='lv' %}naktis{% else %}nights{% endif %}</div>
+              </div>
+            </div>
+            <div class="room-spec-card">
+              <span class="room-spec-icon">🗓️</span>
+              <div>
+                <div class="room-spec-label">{% if lang=='lv' %}Maksimālais uzturēšanās laiks{% else %}Maximum Stay{% endif %}</div>
+                <div class="room-spec-value">{{ room.max_stay or 365 }} {% if lang=='lv' %}naktis{% else %}nights{% endif %}</div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- AVAILABILITY CALENDAR (click to select check-in / check-out) -->
         <div class="avail-cal">
           <div class="avail-cal-heading">📅 {% if lang=='lv' %}Pieejamība{% else %}Availability{% endif %}</div>
           <div class="avail-cal-head">
@@ -62,6 +115,22 @@
             <span class="avail-cal-legend-item"><span class="avail-cal-dot available"></span> {% if lang=='lv' %}Pieejams{% else %}Available{% endif %}</span>
             <span class="avail-cal-legend-item"><span class="avail-cal-dot booked"></span> {% if lang=='lv' %}Rezervēts{% else %}Booked{% endif %}</span>
             <span class="avail-cal-legend-item"><span class="avail-cal-dot past"></span> {% if lang=='lv' %}Pagājis{% else %}Past{% endif %}</span>
+            <span class="avail-cal-legend-item"><span class="avail-cal-dot selected"></span> {% if lang=='lv' %}Izvēlēts{% else %}Selected{% endif %}</span>
+          </div>
+          <!-- Selection summary box — updates live as calendar days are clicked -->
+          <div class="avail-cal-summary" id="calSummary">
+            <div class="avail-cal-summary-row">
+              <span>{% if lang=='lv' %}Reģistrēšanās{% else %}Check-in{% endif %}</span>
+              <strong id="calSummaryCheckin">—</strong>
+            </div>
+            <div class="avail-cal-summary-row">
+              <span>{% if lang=='lv' %}Izrakstīšanās{% else %}Check-out{% endif %}</span>
+              <strong id="calSummaryCheckout">—</strong>
+            </div>
+            <div class="avail-cal-summary-row">
+              <span>{% if lang=='lv' %}Kopā{% else %}Total{% endif %}</span>
+              <strong id="calSummaryTotal">—</strong>
+            </div>
           </div>
         </div>
 
@@ -246,15 +315,17 @@
           <div class="room-price" style="font-size:32px">€{{ '%.0f'|format(room.price) }}<span style="font-size:15px">{% if lang=='lv' %}/naktī{% else %}/night{% endif %}</span></div>
           <p style="color:var(--gray-500);font-size:14px;margin:8px 0 20px">{% if lang=='lv' %}Nodokļi un maksas tiek aprēķinātas norēķinoties.{% else %}Taxes & fees calculated at checkout.{% endif %}</p>
 
-          <!-- INLINE BOOK NOW FORM (no extra page) -->
+          <!-- INLINE BOOK NOW FORM — dates are set by clicking the calendar on the left, not typed here -->
           <form method="post" action="{{ url_for('booking', room_id=room.id) }}" id="inlineBookForm">
             <div class="form-group">
               <label>{% if lang=='lv' %}Reģistrēšanās{% else %}Check-in{% endif %}</label>
-              <input type="text" id="ib_check_in" name="check_in" placeholder="{% if lang=='lv' %}Izvēlieties reģistrēšanās datumu{% else %}Select check-in date{% endif %}" required readonly>
+              <input type="text" id="ib_check_in_display" placeholder="{% if lang=='lv' %}Izvēlieties kalendārā{% else %}Pick a date on the calendar{% endif %}" readonly>
+              <input type="hidden" id="ib_check_in" name="check_in">
             </div>
             <div class="form-group">
               <label>{% if lang=='lv' %}Izrakstīšanās{% else %}Check-out{% endif %}</label>
-              <input type="text" id="ib_check_out" name="check_out" placeholder="{% if lang=='lv' %}Izvēlieties izrakstīšanās datumu{% else %}Select check-out date{% endif %}" required readonly>
+              <input type="text" id="ib_check_out_display" placeholder="{% if lang=='lv' %}Izvēlieties kalendārā{% else %}Pick a date on the calendar{% endif %}" readonly>
+              <input type="hidden" id="ib_check_out" name="check_out">
             </div>
             <div class="form-group">
               <label>{% if lang=='lv' %}Viesi{% else %}Guests{% endif %}</label>
@@ -262,7 +333,7 @@
                 {% for n in range(1, room.capacity + 1) %}<option value="{{ n }}">{{ n }} {% if lang=='lv' %}viesis{% else %}guest{{ 's' if n > 1 }}{% endif %}</option>{% endfor %}
               </select>
             </div>
-            <div id="ibSummaryLine" style="color:var(--gray-500);font-size:13px;margin-bottom:12px">{% if lang=='lv' %}Izvēlieties datumus, lai redzētu kopsummu{% else %}Select dates to see total{% endif %}</div>
+            <div id="ibSummaryLine" style="color:var(--gray-500);font-size:13px;margin-bottom:12px">{% if lang=='lv' %}Izvēlieties datumus kalendārā, lai redzētu kopsummu{% else %}Pick dates on the calendar to see the total{% endif %}</div>
             <button type="submit" class="btn-primary btn-full">{% if lang=='lv' %}Rezervēt tagad{% else %}Book Now{% endif %}</button>
           </form>
           <div style="text-align:center;margin-top:14px"><span class="pay-badge">🔒 {% if lang=='lv' %}Drošs Stripe norēķins{% else %}Secure Stripe checkout{% endif %}</span></div>
@@ -307,60 +378,33 @@
     </div>
   </div>
 </div>
+
+<style>
+  /* Room Specifications */
+  .room-specs-section{margin-top:34px}
+  .room-specs-title{font-size:22px;margin:0 0 14px}
+  .room-specs-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:14px}
+  .room-spec-card{display:flex;align-items:center;gap:14px;background:var(--gray-50,#f7f7fb);border-radius:var(--radius-md,12px);padding:16px 18px}
+  .room-spec-icon{font-size:22px;width:40px;height:40px;flex:none;display:flex;align-items:center;justify-content:center;background:#fff;border-radius:10px}
+  .room-spec-label{font-size:12px;color:var(--gray-500);margin-bottom:2px}
+  .room-spec-value{font-size:15px;font-weight:600;color:var(--gray-900,#1a1a2e)}
+
+  /* Calendar selection states */
+  .avail-cal-day{cursor:default}
+  .avail-cal-day.available{cursor:pointer}
+  .avail-cal-day.available:hover{outline:2px solid var(--primary);outline-offset:-2px}
+  .avail-cal-day.selected{background:var(--primary)!important;color:#fff!important;font-weight:700}
+  .avail-cal-day.in-range{background:rgba(26,115,232,0.15)!important}
+  .avail-cal-dot.selected{background:var(--primary)}
+
+  .avail-cal-summary{margin-top:16px;border-top:1px solid var(--gray-100,#eee);padding-top:14px;display:flex;flex-direction:column;gap:8px}
+  .avail-cal-summary-row{display:flex;justify-content:space-between;font-size:14px;color:var(--gray-700)}
+  .avail-cal-summary-row strong{color:var(--gray-900,#1a1a2e)}
+</style>
 {% endblock %}
 
 {% block scripts %}
-<script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
 <script>
-  // Inline "Book Now" date pickers + live price summary
-  (function () {
-    const price = {{ room.price }};
-    const line = document.getElementById('ibSummaryLine');
-    function update(a, b) {
-      if (!a || !b || !line) return;
-      const n = Math.round((b - a) / 86400000);
-      if (n > 0) {
-        line.textContent = '€' + price.toFixed(0) + ' × ' + n + ' night' + (n > 1 ? 's' : '') + ' = €' + (n * price).toFixed(0);
-      }
-    }
-    const ci = flatpickr('#ib_check_in', {
-      minDate: 'today', dateFormat: 'Y-m-d',
-      onChange: d => { if (d[0]) { co.set('minDate', new Date(d[0]).fp_incr(1)); update(d[0], co.selectedDates[0]); } }
-    });
-    const co = flatpickr('#ib_check_out', {
-      minDate: new Date().fp_incr(1), dateFormat: 'Y-m-d',
-      onChange: d => update(ci.selectedDates[0], d[0])
-    });
-  })();
-
-  // Redirect "Book Now" to Beds24 booking engine (Stripe handled on Beds24 side)
-  (function () {
-    const form = document.getElementById('inlineBookForm');
-    if (!form) return;
-    form.addEventListener('submit', function (e) {
-      e.preventDefault();
-      const checkin = document.getElementById('ib_check_in').value;
-      const checkout = document.getElementById('ib_check_out').value;
-      const guestsSelect = form.querySelector('select[name="guests"]');
-      const guests = guestsSelect ? guestsSelect.value : 1;
-
-      const propId = '{{ room.beds24_property_id or "" }}';
-      const roomId = '{{ room.beds24_room_id or "" }}';
-      if (!propId) {
-        alert('{% if lang=="lv" %}Šai istabai nav pieejama tiešsaistes rezervācija. Lūdzu, sazinieties ar mums.{% else %}Online booking is not available for this room yet. Please contact us.{% endif %}');
-        return;
-      }
-      let url = 'https://beds24.com/booking2.php?propid=' + propId;
-      if (roomId) url += '&roomid=' + roomId;
-      if (checkin) url += '&checkin=' + checkin;
-      if (checkout) url += '&checkout=' + checkout;
-      if (guests) url += '&numadult=' + guests;
-      url += '&referer=riganest';
-
-      window.location.href = url;
-    });
-  })();
-
   // Photo slideshow
   var slides=document.querySelectorAll('#slider .detail-slide');
   var thumbs=document.querySelectorAll('#thumbs .detail-thumb');
@@ -395,9 +439,14 @@
     head.querySelector('.pm').textContent=open?'+':'–';
   }
 
-  // Availability calendar
+  // Availability calendar — CLICKABLE date-range selection
   (function(){
     var bookedRanges = {{ booked_ranges|default([])|tojson }};
+    var pricePerNight = {{ room.price }};
+    var minStay = {{ room.min_stay or 1 }};
+    var maxStay = {{ room.max_stay or 365 }};
+    var lang = {{ (lang == 'lv')|tojson }};
+
     var today = new Date();
     today.setHours(0,0,0,0);
     var viewDate = new Date(today.getFullYear(), today.getMonth(), 1);
@@ -408,12 +457,102 @@
     var nextBtn = document.getElementById('calNext');
     if (!gridEl) return;
 
+    var summaryCheckin  = document.getElementById('calSummaryCheckin');
+    var summaryCheckout = document.getElementById('calSummaryCheckout');
+    var summaryTotal    = document.getElementById('calSummaryTotal');
+    var ibCheckIn  = document.getElementById('ib_check_in');
+    var ibCheckOut = document.getElementById('ib_check_out');
+    var ibCheckInDisplay  = document.getElementById('ib_check_in_display');
+    var ibCheckOutDisplay = document.getElementById('ib_check_out_display');
+    var ibSummaryLine = document.getElementById('ibSummaryLine');
+
+    var selectedCheckIn = null;   // Date
+    var selectedCheckOut = null;  // Date
+
     function isBooked(d){
       return bookedRanges.some(function(r){
         var from = new Date(r.from), to = new Date(r.to);
         from.setHours(0,0,0,0); to.setHours(0,0,0,0);
         return d >= from && d < to;
       });
+    }
+
+    // True if every night between two dates (inclusive of start, exclusive of end) is bookable
+    function rangeIsClear(start, end){
+      var d = new Date(start);
+      while (d < end) {
+        if (d < today || isBooked(d)) return false;
+        d.setDate(d.getDate() + 1);
+      }
+      return true;
+    }
+
+    function fmt(d){
+      return d.toISOString().slice(0,10);
+    }
+
+    function updateSummary(){
+      if (selectedCheckIn) {
+        summaryCheckin.textContent = fmt(selectedCheckIn);
+        ibCheckIn.value = fmt(selectedCheckIn);
+        ibCheckInDisplay.value = fmt(selectedCheckIn);
+      } else {
+        summaryCheckin.textContent = '—';
+        ibCheckIn.value = '';
+        ibCheckInDisplay.value = '';
+      }
+      if (selectedCheckOut) {
+        summaryCheckout.textContent = fmt(selectedCheckOut);
+        ibCheckOut.value = fmt(selectedCheckOut);
+        ibCheckOutDisplay.value = fmt(selectedCheckOut);
+      } else {
+        summaryCheckout.textContent = '—';
+        ibCheckOut.value = '';
+        ibCheckOutDisplay.value = '';
+      }
+      if (selectedCheckIn && selectedCheckOut) {
+        var nights = Math.round((selectedCheckOut - selectedCheckIn) / 86400000);
+        var total = nights * pricePerNight;
+        var nightsWord = lang ? 'naktis' : ('night' + (nights > 1 ? 's' : ''));
+        summaryTotal.textContent = '€' + total.toFixed(0) + ' (' + nights + ' ' + nightsWord + ')';
+        ibSummaryLine.textContent = '€' + pricePerNight.toFixed(0) + ' × ' + nights + ' ' + nightsWord + ' = €' + total.toFixed(0);
+      } else {
+        summaryTotal.textContent = '—';
+        ibSummaryLine.textContent = lang ? 'Izvēlieties datumus kalendārā, lai redzētu kopsummu' : 'Pick dates on the calendar to see the total';
+      }
+    }
+
+    function onDayClick(d){
+      if (d < today || isBooked(d)) return;
+
+      if (!selectedCheckIn || (selectedCheckIn && selectedCheckOut)) {
+        // Start a new selection
+        selectedCheckIn = d;
+        selectedCheckOut = null;
+      } else {
+        // Picking check-out
+        if (d <= selectedCheckIn) {
+          selectedCheckIn = d;
+          selectedCheckOut = null;
+        } else {
+          var nights = Math.round((d - selectedCheckIn) / 86400000);
+          if (nights < minStay) {
+            alert((lang ? 'Minimālais uzturēšanās laiks ir ' : 'Minimum stay is ') + minStay + (lang ? ' naktis' : ' nights'));
+            return;
+          }
+          if (nights > maxStay) {
+            alert((lang ? 'Maksimālais uzturēšanās laiks ir ' : 'Maximum stay is ') + maxStay + (lang ? ' naktis' : ' nights'));
+            return;
+          }
+          if (!rangeIsClear(selectedCheckIn, d)) {
+            alert(lang ? 'Šajā periodā ir rezervētas dienas. Lūdzu, izvēlieties citu periodu.' : 'Some nights in that range are already booked. Please pick a different range.');
+            return;
+          }
+          selectedCheckOut = d;
+        }
+      }
+      updateSummary();
+      renderCalendar();
     }
 
     function renderCalendar(){
@@ -441,16 +580,27 @@
         var d = new Date(year, month, day);
         var cell = document.createElement('div');
         var cls = 'avail-cal-day';
+        var clickable = false;
+
         if (d < today) {
           cls += ' past';
         } else if (isBooked(d)) {
           cls += ' booked';
         } else {
           cls += ' available';
+          clickable = true;
         }
+
+        if (selectedCheckIn && d.getTime() === selectedCheckIn.getTime()) cls += ' selected';
+        if (selectedCheckOut && d.getTime() === selectedCheckOut.getTime()) cls += ' selected';
+        if (selectedCheckIn && selectedCheckOut && d > selectedCheckIn && d < selectedCheckOut) cls += ' in-range';
         if (d.getTime() === today.getTime()) cls += ' today';
+
         cell.className = cls;
         cell.textContent = day;
+        if (clickable) {
+          cell.addEventListener('click', (function(dd){ return function(){ onDayClick(dd); }; })(d));
+        }
         gridEl.appendChild(cell);
       }
     }
@@ -464,7 +614,40 @@
       renderCalendar();
     });
 
+    updateSummary();
     renderCalendar();
+  })();
+
+  // "Book Now" -> Beds24 booking engine (dates come from calendar selection, not typed)
+  (function () {
+    var form = document.getElementById('inlineBookForm');
+    if (!form) return;
+    form.addEventListener('submit', function (e) {
+      e.preventDefault();
+      var checkin = document.getElementById('ib_check_in').value;
+      var checkout = document.getElementById('ib_check_out').value;
+      if (!checkin || !checkout) {
+        alert('{% if lang=="lv" %}Lūdzu, izvēlieties reģistrēšanās un izrakstīšanās datumus kalendārā.{% else %}Please pick your check-in and check-out dates on the calendar above.{% endif %}');
+        return;
+      }
+      var guestsSelect = form.querySelector('select[name="guests"]');
+      var guests = guestsSelect ? guestsSelect.value : 1;
+
+      var propId = '{{ room.beds24_property_id or "" }}';
+      var roomId = '{{ room.beds24_room_id or "" }}';
+      if (!propId) {
+        alert('{% if lang=="lv" %}Šai istabai nav pieejama tiešsaistes rezervācija. Lūdzu, sazinieties ar mums.{% else %}Online booking is not available for this room yet. Please contact us.{% endif %}');
+        return;
+      }
+      var url = 'https://beds24.com/booking2.php?propid=' + propId;
+      if (roomId) url += '&roomid=' + roomId;
+      if (checkin) url += '&checkin=' + checkin;
+      if (checkout) url += '&checkout=' + checkout;
+      if (guests) url += '&numadult=' + guests;
+      url += '&referer=riganest';
+
+      window.location.href = url;
+    });
   })();
 </script>
 {% endblock %}
