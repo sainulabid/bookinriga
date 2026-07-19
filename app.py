@@ -1428,6 +1428,91 @@ def admin_migrate_to_homestate_rooms():
     }
 
 
+@app.route("/admin/cleanup-homestate-duplicates")
+@admin_required
+def admin_cleanup_homestate_duplicates():
+    """
+    ONE-TIME CLEANUP, follow-up to /admin/migrate-to-homestate-rooms.
+
+    That migration deactivated 13 rooms it couldn't exact-match by name
+    against the Homestate CSV. But 8 of those 13 already had a correct,
+    working beds24_room_id set by an earlier (pre-this-conversation)
+    mapping pass — the CSV loop just didn't touch them since the name
+    didn't match, so they stayed deactivated even though their pricing
+    was fine. Meanwhile the CSV loop's own row for that same physical
+    Beds24 room created a SEPARATE new Room with a different name,
+    pointing at the identical beds24_room_id — a duplicate listing.
+
+    This fixes both sides in one pass, using room names as keys:
+      1. Reactivates the 8 originals that turned out to have real
+         pricing all along.
+      2. Deactivates their newly-created duplicate counterparts.
+
+    The remaining 5 of the original 13 (Riga City Center Apartment,
+    Kalnina Quiet Apartment in city center, both Kr. Barona iela 24/26
+    apartments, Kungu iela 25 ...) genuinely have no rate plan in
+    Beds24 at all — those stay deactivated until fixed in Beds24
+    directly. Safe to re-run. Remove this route once confirmed.
+    """
+    reactivate_names = [
+        "Old Riga Cozy One Bedroom Apartment",
+        "Old Riga Terrace Apartment",
+        "Old Riga Palasta Loft Apartment with river view",
+        "Brīvības Yard Apartment With Parking In City Center",
+        "Riga Riverside Design One Bedroom Apartment",
+        "Old Riga Kaleju Cozy apartment2",
+        "Old Riga 2 Bedroom Vecpilsetas street Apartment",
+    ]
+    # (Modern Design Studio Apartment In Riga Center was already
+    # reactivated correctly by the CSV loop itself, no action needed.)
+
+    duplicate_names_to_deactivate = [
+        "Kaleju iela 57-5",                                             # dup of Old Riga Cozy One Bedroom Apartment
+        "Teātra iela 4-19",                                             # dup of Old Riga Terrace Apartment
+        "Palasta iela 9 - 21",                                          # dup of Old Riga Palasta Loft Apartment with river view
+        "Brīvības iela 60",                                             # dup of Brīvības Yard Apartment With Parking In City Center
+        "Riverside Design Apartment With Underground Private Parking",  # dup of Riga Riverside Design One Bedroom Apartment
+        "Old Riga Kaleju Cozy apartment",                               # dup of Old Riga Kaleju Cozy apartment2
+        "Vecpilsētas iela 3k1 - 1",                                     # dup of Old Riga 2 Bedroom Vecpilsetas street Apartment
+        "Kalnina Design Studio in Centre",                              # dup of A. Kalnina iela 1-57
+        "City Retreat Design Apartment",                                # dup of Marijas iela 4-24
+    ]
+
+    reactivated, dup_deactivated, not_found = [], [], []
+
+    for name in reactivate_names:
+        room = Room.query.filter(db.func.lower(Room.name) == name.strip().lower()).first()
+        if room:
+            room.is_active = True
+            reactivated.append(name)
+        else:
+            not_found.append(name)
+
+    for name in duplicate_names_to_deactivate:
+        room = Room.query.filter(db.func.lower(Room.name) == name.strip().lower()).first()
+        if room:
+            room.is_active = False
+            dup_deactivated.append(name)
+        else:
+            not_found.append(name)
+
+    db.session.commit()
+
+    return {
+        "reactivated": reactivated,
+        "duplicates_deactivated": dup_deactivated,
+        "not_found": not_found,
+        "total_active_rooms_now": Room.query.filter_by(is_active=True).count(),
+        "still_deactivated_no_price_in_beds24": [
+            "Riga City Center Apartment",
+            "Kalnina Quiet Apartment in city center",
+            "Kr. Barona iela 24/26 Residential Barona One Bedroom Apartment",
+            "Kr. Barona iela 24/26 One Bedroom Apartment",
+            "Kungu iela 25 Old Riga Ridzenes Residence Studio Apartment",
+        ],
+    }
+
+
 @app.route("/admin")
 @admin_required
 def admin_dashboard():
