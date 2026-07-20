@@ -1,5 +1,5 @@
 """
-RigaNest — Premium Hotel Booking
+BookinRiga — Premium Hotel Booking
 Full Flask app: user accounts, Gmail email OTP login, Stripe payments,
 calendar booking, admin panel, image uploads, homepage slider.
 
@@ -76,7 +76,7 @@ GOOGLE_LOGIN_ENABLED = bool(GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET)
 
 # WhatsApp contact number shown as a floating button site-wide and on the
 # room detail page. Stored as digits-only (wa.me format) + a display form.
-WHATSAPP_NUMBER = os.environ.get("WHATSAPP_NUMBER", "+371 28 458 050")
+WHATSAPP_NUMBER = os.environ.get("WHATSAPP_NUMBER", "+371 293 555 37")
 WHATSAPP_NUMBER_DIGITS = "".join(ch for ch in WHATSAPP_NUMBER if ch.isdigit())
 
 app = Flask(__name__)
@@ -508,13 +508,13 @@ def send_otp(user):
     user.otp_expiry = datetime.utcnow() + timedelta(minutes=5)
     db.session.commit()
 
-    subject = "Your RigaNest verification code"
+    subject = "Your BookinRiga verification code"
     body = (f"Hi {user.name},\n\n"
-            f"Your RigaNest verification code is: {code}\n"
+            f"Your BookinRiga verification code is: {code}\n"
             f"This code expires in 5 minutes.\n\n"
             f"If you didn't request this, you can ignore this email.")
     html_body = (f"<p>Hi {user.name},</p>"
-                 f"<p>Your RigaNest verification code is: <strong>{code}</strong></p>"
+                 f"<p>Your BookinRiga verification code is: <strong>{code}</strong></p>"
                  f"<p>This code expires in 5 minutes.</p>"
                  f"<p>If you didn't request this, you can ignore this email.</p>")
 
@@ -529,7 +529,7 @@ def send_otp(user):
                     "Content-Type": "application/json",
                 },
                 json={
-                    "from": f"RigaNest <{RESEND_FROM_EMAIL}>",
+                    "from": f"BookinRiga <{RESEND_FROM_EMAIL}>",
                     "to": [user.email],
                     "subject": subject,
                     "html": html_body,
@@ -862,7 +862,7 @@ def verify_otp():
             session.pop("dev_otp", None)
             session.pop("new_registration", None)
             if is_new_account:
-                flash("Welcome to RigaNest! Your account is ready.", "success")
+                flash("Welcome to BookinRiga! Your account is ready.", "success")
             else:
                 flash("Logged in successfully.", "success")
             nxt = session.pop("next_url", None)
@@ -1071,7 +1071,7 @@ def beds24_return():
             db.session.commit()
 
     if not user:
-        flash("Your booking on Beds24 is confirmed! Sign in or contact us to link it to your RigaNest account.", "success")
+        flash("Your booking on Beds24 is confirmed! Sign in or contact us to link it to your BookinRiga account.", "success")
         return redirect(url_for("index"))
 
     bk = Booking(user_id=user.id, room_id=room.id, check_in=ci, check_out=co,
@@ -2154,7 +2154,7 @@ def seed():
     db.create_all()
     auto_migrate()
     if not User.query.filter_by(email="admin@riganest.com").first():
-        a = User(name="RigaNest Admin", email="admin@riganest.com",
+        a = User(name="BookinRiga Admin", email="admin@riganest.com",  # login email kept as-is — it's the existing live admin credential
                  phone="+10000000000", is_admin=True)
         a.set_password("admin123")
         db.session.add(a)
