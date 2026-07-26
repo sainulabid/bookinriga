@@ -1621,11 +1621,27 @@ def admin_fix_homestate_images():
                 not_found.append(room_name)
                 continue
 
+            # Never clobber a manually-uploaded photo (Cloudinary, or any
+            # non-Beds24 source) with Beds24's own lower-quality copies.
+            # Only take the CSV's image if the room has none yet, or its
+            # current image already came from Beds24's media host.
+            current_is_beds24_or_empty = (
+                not room.image or "media.xmlcal.com" in room.image
+            )
+            if not current_is_beds24_or_empty:
+                skipped_no_image.append(f"{room_name} (kept existing uploaded photo)")
+                continue
+
             room.image = image_urls[0]
-            # Replace old extra photos for this room with the CSV's list
-            RoomImage.query.filter_by(room_id=room.id).delete()
-            for extra_url in image_urls[1:]:
-                db.session.add(RoomImage(room_id=room.id, filename=extra_url))
+            # Same rule for the extra gallery photos: only replace ones
+            # that are themselves from Beds24, leave manually-uploaded
+            # RoomImage rows alone.
+            existing_extra = RoomImage.query.filter_by(room_id=room.id).all()
+            manual_extra = [ri for ri in existing_extra if "media.xmlcal.com" not in (ri.filename or "")]
+            if not manual_extra:
+                RoomImage.query.filter_by(room_id=room.id).delete()
+                for extra_url in image_urls[1:]:
+                    db.session.add(RoomImage(room_id=room.id, filename=extra_url))
             fixed.append({"name": room_name, "photo_count": len(image_urls)})
 
     db.session.commit()
