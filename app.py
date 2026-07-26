@@ -235,7 +235,7 @@ class Room(db.Model):
     size_sqm = db.Column(db.Integer, default=30)
     bathrooms = db.Column(db.Integer, default=1)
     rating = db.Column(db.Float, default=4.8)
-    amenities = db.Column(db.String(255), default="WiFi, AC, Breakfast")
+    amenities = db.Column(db.String(255), default="")
     features = db.Column(db.Text, default="{}")  # JSON: {"amenities": ["heating", ...], "kitchen": [...], ...}
     image = db.Column(db.String(255), default="")
     location = db.Column(db.String(200), default="")
@@ -637,12 +637,31 @@ def upload_attraction_photos(attraction):
                 db.session.add(AttractionImage(attraction_id=attraction.id, filename="uploads/" + fn))
 
 
+def _room_has_upcoming_availability(room, days=90):
+    """True if the room has at least one bookable date (per Beds24 sync)
+    in the next `days` days. Rooms that have never been synced yet (no
+    RoomAvailability rows at all) are treated as available so they
+    aren't unfairly pushed down before their first sync runs."""
+    today = date.today()
+    cutoff = today + timedelta(days=days)
+    rows = RoomAvailability.query.filter(
+        RoomAvailability.room_id == room.id,
+        RoomAvailability.date >= today,
+        RoomAvailability.date <= cutoff,
+    ).all()
+    if not rows:
+        return True
+    return any(r.available for r in rows)
+
+
 # ----------------------------------------------------------------------
 # Public pages
 # ----------------------------------------------------------------------
 @app.route("/")
 def index():
-    rooms = Room.query.filter_by(is_active=True).order_by(Room.rating.desc()).limit(8).all()
+    candidates = Room.query.filter_by(is_active=True).all()
+    candidates.sort(key=lambda r: (not _room_has_upcoming_availability(r), -r.rating))
+    rooms = candidates[:8]
     slides = [url_for("static", filename=f"slides/{fn}") for fn in get_banner_images()]
     gallery = Attraction.query.filter_by(is_active=True).order_by(Attraction.created_at.desc()).limit(8).all()
     today_str = date.today().isoformat()
@@ -689,8 +708,19 @@ def rooms():
                 for b in r.bookings
             )
             if not has_conflict:
-                available.append(r)
+                blocked = RoomAvailability.query.filter(
+                    RoomAvailability.room_id == r.id,
+                    RoomAvailability.date >= check_in,
+                    RoomAvailability.date < check_out,
+                    RoomAvailability.available.is_(False),
+                ).first()
+                if not blocked:
+                    available.append(r)
         listings = available
+    else:
+        # No dates picked yet — still don't feature listings with no
+        # real upcoming availability ahead of ones that do.
+        listings.sort(key=lambda r: (not _room_has_upcoming_availability(r), r.price))
 
     return render_template("rooms.html", rooms=listings, q=q,
                            max_price=max_price, guests=guests,

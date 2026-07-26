@@ -97,6 +97,100 @@ def sync_room_specs(access_token, room):
     return True
 
 
+def _humanize_feature_code(code):
+    """'KITCHEN_DINING_AREA' -> 'Kitchen dining area', 'WIFI' -> 'Wifi'."""
+    words = str(code).replace("-", "_").split("_")
+    return " ".join(w.capitalize() for w in words if w)
+
+
+def fetch_property_rooms_with_features(access_token, property_id):
+    """Fetches the full property (with all its rooms) from Beds24,
+    including each room's feature/amenity codes — the same codes seen
+    under (Beds24 control panel) Settings > Properties > Rooms > Setup
+    > Features > Amenities (e.g. WIFI, KITCHEN, DISHWASHER, ...).
+
+    NOTE: the exact JSON key Beds24 uses for this list isn't confirmed
+    yet for this account — this tries several likely candidates and,
+    the first time it runs, prints the raw room block so the key can
+    be corrected if none of the candidates match.
+    """
+    resp = requests.get(
+        f"{API_BASE}/properties",
+        headers={"accept": "application/json", "token": access_token},
+        params={"id": property_id, "includeAllRooms": "true"},
+        timeout=30,
+    )
+    data = resp.json()
+    if resp.status_code != 200 or not data.get("data"):
+        print(f"  [warn] property fetch failed for property {property_id}: {data}")
+        return {}
+
+    prop = data["data"][0]
+    rooms_by_id = {}
+    for room_info in prop.get("roomTypes", prop.get("rooms", [])):
+        rid = room_info.get("roomId") or room_info.get("id")
+        if rid is not None:
+            rooms_by_id[int(rid)] = room_info
+    return rooms_by_id
+
+
+def sync_room_amenities(access_token, room, property_rooms_cache):
+    """Updates Room.amenities from Beds24 feature codes, UNLESS the
+    admin has manually overridden the room's specs (reuses the same
+    specs_manual_override flag as sync_room_specs, since amenities are
+    part of the same 'don't silently clobber admin edits' contract)."""
+    if room.specs_manual_override:
+        print(f"  [skip] room {room.id} ({room.name}): manually overridden, not touching amenities")
+        return False
+
+    info = property_rooms_cache.get(room.beds24_property_id, {}).get(room.beds24_room_id)
+    if not info:
+        return False
+
+    codes = _first_present(
+        info, ["roomFeatureCodes", "featureCodes", "amenityCodes", "features", "amenities"], None
+    )
+    if not codes:
+        print(f"  [warn] room {room.id} ({room.name}): no feature-code field found on this "
+              f"account's response — raw room block: {info}")
+        return False
+
+    labels = [_humanize_feature_code(c) for c in codes]
+    room.amenities = ", ".join(labels)
+    db.session.commit()
+    return True
+
+
+def main_amenities():
+    """Entry point for the separate, occasional amenities sync.
+    Run manually: python beds24_sync.py --amenities
+    """
+    if not BEDS24_REFRESH_TOKEN:
+        print("ERROR: BEDS24_REFRESH_TOKEN environment variable is not set.")
+        sys.exit(1)
+
+    with app.app_context():
+        access_token = get_access_token()
+        rooms = Room.query.filter(
+            Room.beds24_room_id.isnot(None), Room.beds24_property_id.isnot(None)
+        ).all()
+        if not rooms:
+            print("No rooms have both beds24_room_id and beds24_property_id set yet.")
+            return
+
+        property_rooms_cache = {}
+        for pid in {r.beds24_property_id for r in rooms}:
+            property_rooms_cache[pid] = fetch_property_rooms_with_features(access_token, pid)
+
+        print(f"Syncing amenities for {len(rooms)} room(s)...")
+        updated = 0
+        for room in rooms:
+            print(f"- Room #{room.id} ({room.name}) <- Beds24 room {room.beds24_room_id}")
+            if sync_room_amenities(access_token, room, property_rooms_cache):
+                updated += 1
+        print(f"Done. Amenities updated for {updated}/{len(rooms)} room(s).")
+
+
 def main_specs():
     """Entry point for the separate, occasional specs sync."""
     if not BEDS24_REFRESH_TOKEN:
@@ -285,4 +379,9 @@ def main():
 
 
 if __name__ == "__main__":
-    main()
+    if "--specs" in sys.argv:
+        main_specs()
+    elif "--amenities" in sys.argv:
+        main_amenities()
+    else:
+        main()

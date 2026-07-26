@@ -50,13 +50,15 @@
         <div class="room-specs-section">
           <h3 class="room-specs-title">{% if lang=='lv' %}Istabas specifikācija{% else %}Room Specifications{% endif %}</h3>
           <div class="room-specs-grid">
+            {% if room.bed_type or room.room_type %}
             <div class="room-spec-card">
               <span class="room-spec-icon">🛏️</span>
               <div>
                 <div class="room-spec-label">{% if lang=='lv' %}Gultas veids{% else %}Bed Type{% endif %}</div>
-                <div class="room-spec-value">{{ room.bed_type if room.bed_type else (room.room_type or (('Istaba' if lang=='lv' else 'Room'))) }}</div>
+                <div class="room-spec-value">{{ room.bed_type or room.room_type }}</div>
               </div>
             </div>
+            {% endif %}
             <div class="room-spec-card">
               <span class="room-spec-icon">📐</span>
               <div>
@@ -319,12 +321,12 @@
           <form method="post" action="{{ url_for('booking', room_id=room.id) }}" id="inlineBookForm">
             <div class="form-group">
               <label>{% if lang=='lv' %}Reģistrēšanās{% else %}Check-in{% endif %}</label>
-              <input type="text" id="ib_check_in_display" placeholder="{% if lang=='lv' %}Izvēlieties kalendārā{% else %}Pick a date on the calendar{% endif %}" readonly>
+              <input type="text" id="ib_check_in_display" style="cursor:pointer" placeholder="{% if lang=='lv' %}Izvēlieties kalendārā ↑{% else %}Tap to pick on calendar ↑{% endif %}" readonly>
               <input type="hidden" id="ib_check_in" name="check_in">
             </div>
             <div class="form-group">
               <label>{% if lang=='lv' %}Izrakstīšanās{% else %}Check-out{% endif %}</label>
-              <input type="text" id="ib_check_out_display" placeholder="{% if lang=='lv' %}Izvēlieties kalendārā{% else %}Pick a date on the calendar{% endif %}" readonly>
+              <input type="text" id="ib_check_out_display" style="cursor:pointer" placeholder="{% if lang=='lv' %}Izvēlieties kalendārā ↑{% else %}Tap to pick on calendar ↑{% endif %}" readonly>
               <input type="hidden" id="ib_check_out" name="check_out">
             </div>
             <div class="form-group">
@@ -397,6 +399,8 @@
   .avail-cal-day.in-range{background:rgba(26,115,232,0.15)!important}
   .avail-cal-dot.selected{background:var(--primary)}
 
+  .avail-cal{transition:box-shadow 0.3s ease}
+  .avail-cal-flash{box-shadow:0 0 0 3px var(--gold,#d4a94a)}
   .avail-cal-summary{margin-top:16px;border-top:1px solid var(--gray-100,#eee);padding-top:14px;display:flex;flex-direction:column;gap:8px}
   .avail-cal-summary-row{display:flex;justify-content:space-between;font-size:14px;color:var(--gray-700)}
   .avail-cal-summary-row strong{color:var(--gray-900,#1a1a2e)}
@@ -616,6 +620,18 @@
 
     updateSummary();
     renderCalendar();
+
+    // Tapping the readonly sidebar boxes jumps to the real calendar
+    // and flashes a highlight, since the boxes themselves can't be typed into.
+    var calContainer = document.querySelector('.avail-cal');
+    function jumpToCalendar(){
+      if (!calContainer) return;
+      calContainer.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      calContainer.classList.add('avail-cal-flash');
+      setTimeout(function(){ calContainer.classList.remove('avail-cal-flash'); }, 1200);
+    }
+    if (ibCheckInDisplay)  ibCheckInDisplay.addEventListener('click', jumpToCalendar);
+    if (ibCheckOutDisplay) ibCheckOutDisplay.addEventListener('click', jumpToCalendar);
   })();
 
   // "Book Now" -> Beds24 booking engine (dates come from calendar selection, not typed)
