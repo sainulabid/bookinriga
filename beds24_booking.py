@@ -195,6 +195,8 @@ def sync_booking(booking_id):
         client = Client()
         client.verify_room(bk.room)
         row = client.find(bk)
+        if bk.beds24_booking_id and not row:
+            raise SyncError('remote_booking_not_verified', ambiguous=True)
         if row:
             bk.beds24_booking_id = row['id']
             db.session.commit()  # Persist remote ID before any cancellation call.
@@ -203,11 +205,15 @@ def sync_booking(booking_id):
                 if previous == 'ambiguous':
                     raise SyncError('creation_unknown_manual_review', ambiguous=True)
             else:
-                client.post({'id': bk.beds24_booking_id, 'status': 'cancelled'})
+                if not row or row.get('status') != 'cancelled':
+                    client.post({'id': bk.beds24_booking_id, 'status': 'cancelled'})
+                    row = client.find(bk)
+                    if not row or row.get('status') != 'cancelled':
+                        raise SyncError('cancellation_not_verified', ambiguous=True)
             bk.status, bk.beds24_sync_state = 'Cancelled', 'cancelled'
         elif bk.beds24_booking_id:
-            if row and row.get('status') == 'cancelled':
-                raise SyncError('remote_cancelled_manual_review', ambiguous=True)
+            if not row or row.get('status') != 'confirmed':
+                raise SyncError('remote_status_manual_review', ambiguous=True)
             bk.status, bk.beds24_sync_state = 'Confirmed', 'synced'
         else:
             if previous == 'ambiguous':

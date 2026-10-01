@@ -31,7 +31,8 @@
           <td>€{{ '%.0f'|format(b.total_price) }}</td>
           <td><span class="badge {{ 'badge-green' if b.payment_status=='Paid' else 'badge-gold' }}">{{ b.payment_status }}</span></td>
           <td>
-            {% if b.status=='Confirmed' %}<span class="badge badge-green">{% if lang=='lv' %}Apstiprināta{% else %}Confirmed{% endif %}</span>
+            {% if b.cancel_requested and b.status!='Cancelled' %}<span class="badge badge-gold">Cancellation pending</span>
+            {% elif b.status=='Confirmed' %}<span class="badge badge-green">{% if lang=='lv' %}Apstiprināta{% else %}Confirmed{% endif %}</span>
             {% elif b.status=='Pending' %}<span class="badge badge-gold">{% if lang=='lv' %}Gaida{% else %}Pending{% endif %}</span>
             {% else %}<span class="badge badge-red">{% if lang=='lv' %}Atcelta{% else %}Cancelled{% endif %}</span>{% endif %}
           </td>

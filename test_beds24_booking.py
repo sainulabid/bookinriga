@@ -122,7 +122,7 @@ class BookingExportTests(unittest.TestCase):
     def test_cancellation_updates_remote_then_local(self):
         self.ready(); self.bk.beds24_booking_id=1234567; self.bk.status='Confirmed'; self.bk.cancel_requested=True; db.session.commit()
         with patch('beds24_booking.Client') as ctor:
-            ctor.return_value.find.return_value=self.remote()
+            ctor.return_value.find.side_effect=[self.remote(), {**self.remote(), 'status':'cancelled'}]
             sync_booking(self.bk.id)
             ctor.return_value.post.assert_called_once_with({'id':1234567,'status':'cancelled'})
         self.assertEqual(self.bk.status,'Cancelled')
@@ -133,6 +133,19 @@ class BookingExportTests(unittest.TestCase):
             ctor.return_value.find.return_value=self.remote()
             ctor.return_value.post.side_effect=SyncError('write_response_unknown',True)
             sync_booking(self.bk.id)
+        self.assertEqual(self.bk.status,'Confirmed'); self.assertEqual(self.bk.beds24_sync_state,'ambiguous')
+
+    def test_known_id_requires_remote_readback(self):
+        self.ready(); self.bk.beds24_booking_id=1234567; db.session.commit()
+        with patch('beds24_booking.Client') as ctor:
+            ctor.return_value.find.return_value=None; sync_booking(self.bk.id)
+            ctor.return_value.post.assert_not_called()
+        self.assertEqual(self.bk.status,'Pending'); self.assertEqual(self.bk.beds24_sync_state,'ambiguous')
+
+    def test_cancellation_ack_without_readback_stays_blocked(self):
+        self.ready(); self.bk.beds24_booking_id=1234567; self.bk.status='Confirmed'; self.bk.cancel_requested=True; db.session.commit()
+        with patch('beds24_booking.Client') as ctor:
+            ctor.return_value.find.return_value=self.remote(); sync_booking(self.bk.id)
         self.assertEqual(self.bk.status,'Confirmed'); self.assertEqual(self.bk.beds24_sync_state,'ambiguous')
 
     def test_checkout_blocks_before_charge_if_api_unavailable(self):
