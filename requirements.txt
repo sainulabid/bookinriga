@@ -8,4 +8,5 @@ Authlib==1.3.2
 gunicorn==21.2.0
 cloudinary==1.40.0
 psycopg2-binary>=2.9.10
+psycopg[binary]>=3.2
 requests==2.32.3
