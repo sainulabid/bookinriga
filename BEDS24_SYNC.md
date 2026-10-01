@@ -1,39 +1,26 @@
-# Beds24 source catalog
+# BookinRiga reference sync
 
-The website catalog is sourced from **BookinRiga, property 341384**.
-`beds24_catalog.py` reads that property's complete room list using API v2
-`GET /properties` with `includeAllRooms`, `includeTexts`, `includeLanguages`
-and `includePictures`. It does not send updates back to Beds24.
+The required source is https://bookinriga.sites.gas.travel/book-now/.
+Its current published catalog has 50 GAS unit IDs sourced through Beds24
+Marketplace. This is different from the 35-room Beds24 property 341384.
 
-The sync updates names, descriptions, capacity, stay limits, size, amenities
-and room-specific media when returned by the API. New room IDs create listings;
-renames keep the same local room ID. The initial migration matches exact names
-so existing booking references remain intact. Listings outside this catalog and
-removed rooms are deactivated, never deleted. A failed/empty catalog response
-cannot deactivate listings.
+`reference_sync.py` reads the unit selection from the published page and uses
+its public GAS unit and availability endpoints. It copies names, full text,
+photos, amenities, capacities, source order, homepage selections, and 365 days
+of nightly prices/availability. GAS unit IDs are stored separately from Beds24
+room IDs. It needs no Beds24 refresh token and follows the same public data
+source as the reference website; timing depends on the upstream GAS sync.
 
-When IDs change from the former Homestate mapping, old calendar rows and prices
-are cleared. A rate is displayed only after a successful calendar sync returns
-a positive price and availability. Missing prices show “Contact for rates”;
-unknown dates cannot be booked through the local booking endpoint.
+The catalog updates only after every selected room and its calendar validate.
+Any incomplete/API error leaves the previous catalog intact. Removed/unrelated
+rooms become inactive; local IDs and bookings are retained. Missing calendar
+prices or unknown dates cannot be booked. This does not copy guest bookings
+from Beds24 and does not push new local bookings to Beds24/GAS.
 
-`python beds24_sync.py` refreshes the catalog before its calendars. The existing
-admin sync trigger remains available. A background loop starts on the first
-web request and refreshes every 30 minutes while the service is running, retrying
-failures after ten minutes. Render Free can suspend the process during inactivity;
-on wake-up the loop starts again. This is eventual synchronization, not an instant
-webhook. A continuously running worker or scheduled job is needed for updates
-while the web service sleeps.
+The app starts background refresh on its first request, repeats every 30
+minutes, and retries failures after 10 minutes. Render Free sleeps when idle;
+updates resume when it wakes. Logs expose the sync outcome and room count.
 
-Required: an active Beds24 account and the existing `BEDS24_REFRESH_TOKEN` with
-read access to property 341384 and inventory. No secrets belong in this document.
-If the API omits room photos, the sync logs that limitation and preserves the
-existing photos for the matching room. Photo synchronization must be verified
-against the actual response; it must not be assumed from the parameter alone.
-
-Verification on 2026-10-01 found 35 rooms in the BookinRiga control panel. The
-account showed “Your credit has expired,” all rooms showed “No price found,” and
-the public booking page returned “This account has been paused.” Those source
-account conditions need correction in Beds24 before live booking can work.
-
-Tests: `python -m unittest test_beds24_catalog -v` (always uses a temporary DB).
+Existing direct Beds24 utilities remain available, but automatic and normal
+admin sync use the reference source. Do not run legacy mapping/repair scripts
+against the reference catalog.

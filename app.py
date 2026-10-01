@@ -240,6 +240,8 @@ class Room(db.Model):
     features = db.Column(db.Text, default="{}")  # JSON: {"amenities": ["heating", ...], "kitchen": [...], ...}
     image = db.Column(db.String(255), default="")
     location = db.Column(db.String(200), default="")
+    reference_unit_id = db.Column(db.Integer, nullable=True)
+    reference_order = db.Column(db.Integer, nullable=True)
     beds24_room_id = db.Column(db.Integer, nullable=True)
     beds24_property_id = db.Column(db.Integer, nullable=True)
     # Room Specifications — populated from Beds24 by default; if an
@@ -265,7 +267,11 @@ class Room(db.Model):
         return url_for("static", filename="uploads/" + self.image)
 
     def amenity_list(self):
-        if self.beds24_property_id == 341384:
+        if self.reference_unit_id is not None:
+            groups = self.features_dict()
+            return list(dict.fromkeys(a for values in groups.values()
+                                     if isinstance(values, list) for a in values if isinstance(a, str) and a))
+        if (self.reference_unit_id is not None or self.beds24_property_id == 341384):
             return [a.strip() for a in (self.amenities or "").split(",") if a.strip()]
         return [a.strip() for a in self.amenities.split(",")
                 if a.strip() and a.strip().lower() not in {"ac", "air conditioning", "air-conditioning", "breakfast", "breakfast available", "breakfast kit"}]
@@ -469,9 +475,11 @@ def is_available(room_id, ci, co, exclude=None):
     room = db.session.get(Room, room_id)
     if not room or not room.is_active:
         return False
-    if room.beds24_property_id == 341384:
+    if (room.reference_unit_id is not None or room.beds24_property_id == 341384):
         # Unknown dates and missing rates must not look bookable.
         nights = (co - ci).days
+        if nights < room.min_stay or nights > room.max_stay:
+            return False
         count = RoomAvailability.query.filter(
             RoomAvailability.room_id == room_id,
             RoomAvailability.date >= ci, RoomAvailability.date < co,
@@ -718,7 +726,7 @@ def rooms():
         query = query.filter(Room.price <= max_price)
     if guests:
         query = query.filter(Room.capacity >= guests)
-    listings = query.order_by(Room.price.asc()).all()
+    listings = query.order_by(Room.reference_order.asc().nullslast(), Room.price.asc()).all()
 
     if check_in and check_out:
         available = []
@@ -741,7 +749,8 @@ def rooms():
     else:
         # No dates picked yet — still don't feature listings with no
         # real upcoming availability ahead of ones that do.
-        listings.sort(key=lambda r: (not _room_has_upcoming_availability(r), r.price))
+        if not any(r.reference_unit_id for r in listings):
+            listings.sort(key=lambda r: (not _room_has_upcoming_availability(r), r.price))
 
     return render_template("rooms.html", rooms=listings, q=q,
                            max_price=max_price, guests=guests,
@@ -772,7 +781,7 @@ def room_detail(room_id):
     ).all()
     nightly_prices = {r.date.isoformat(): r.price for r in nightly_rows
                       if r.available and r.price and r.price > 0}
-    if room.beds24_property_id == 341384:
+    if (room.reference_unit_id is not None or room.beds24_property_id == 341384):
         # Unsynced/no-rate dates are unknown, never display them as free.
         blocked_dates = sorted(set(blocked_dates) | {
             date.today() + timedelta(days=n) for n in range(366)
@@ -1012,7 +1021,7 @@ def logout():
 @app.route("/book/<int:room_id>", methods=["GET", "POST"])
 def booking(room_id):
     room = Room.query.get_or_404(room_id)
-    if not room.is_active or (room.beds24_property_id == 341384 and room.price <= 0):
+    if not room.is_active or ((room.reference_unit_id is not None or room.beds24_property_id == 341384) and room.price <= 0):
         flash("Online rates are not available yet. Please contact us for this apartment.", "info")
         return redirect(url_for("room_detail", room_id=room.id))
     if not current_user.is_authenticated:
@@ -1302,7 +1311,7 @@ def ensure_beds24_scheduler():
     restarts this loop. API calls never block the visitor's request.
     """
     global _beds24_scheduler_started
-    if app.testing or not os.environ.get("BEDS24_REFRESH_TOKEN"):
+    if app.testing:
         return
     with _beds24_scheduler_lock:
         if _beds24_scheduler_started:
@@ -1337,7 +1346,7 @@ def _get_sync_lock():
 def _run_beds24_sync_background():
     import io
     import contextlib
-    from beds24_sync import main as sync_main
+    from reference_sync import main as sync_main
 
     buf = io.StringIO()
     try:
@@ -1353,7 +1362,7 @@ def _run_beds24_sync_background():
         _beds24_sync_state["running"] = False
         app.logger.warning("Beds24 sync finished: %s", _beds24_sync_state["status"])
         for line in _beds24_sync_state["log"]:
-            if line.startswith("[catalog]") or line.startswith("ERROR: Could not get Beds24") or line.startswith("ERROR: Beds24") or line.startswith("ERROR: Calendar fetch failed") or line.startswith("ERROR: No calendar data"):
+            if line.startswith("[reference]") or line.startswith("[catalog]") or line.startswith("ERROR: Could not get Beds24") or line.startswith("ERROR: Beds24") or line.startswith("ERROR: Calendar fetch failed") or line.startswith("ERROR: No calendar data"):
                 app.logger.warning("Beds24 sync: %s", line)
 
 
