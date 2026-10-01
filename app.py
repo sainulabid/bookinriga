@@ -250,6 +250,7 @@ class Room(db.Model):
     min_stay = db.Column(db.Integer, default=1)
     max_stay = db.Column(db.Integer, default=365)
     specs_manual_override = db.Column(db.Boolean, default=False)
+    homepage_order = db.Column(db.Integer, default=0)
     is_active = db.Column(db.Boolean, default=True)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     bookings = db.relationship("Booking", backref="room", cascade="all, delete-orphan")
@@ -263,7 +264,8 @@ class Room(db.Model):
         return url_for("static", filename="uploads/" + self.image)
 
     def amenity_list(self):
-        return [a.strip() for a in self.amenities.split(",") if a.strip()]
+        return [a.strip() for a in self.amenities.split(",")
+                if a.strip() and a.strip().lower() not in {"ac", "air conditioning", "air-conditioning", "breakfast", "breakfast available", "breakfast kit"}]
 
     def features_dict(self):
         """Return the saved feature tags as {category: [tag_key, ...]}."""
@@ -275,7 +277,8 @@ class Room(db.Model):
 
     def feature_tags(self, category):
         """List of selected tag keys for one category (e.g. 'kitchen')."""
-        return self.features_dict().get(category, [])
+        return [key for key in self.features_dict().get(category, [])
+                if key not in {"air_conditioning", "breakfast"}]
 
     def has_feature(self, category, key):
         return key in self.feature_tags(category)
@@ -661,8 +664,10 @@ def _room_has_upcoming_availability(room, days=90):
 def index():
     candidates = Room.query.filter_by(is_active=True).all()
     candidates.sort(key=lambda r: (not _room_has_upcoming_availability(r), -r.rating))
-    rooms = candidates[:8]
-    slides = [url_for("static", filename=f"slides/{fn}") for fn in get_banner_images()]
+    selected = sorted([r for r in candidates if r.homepage_order and r.homepage_order > 0],
+                      key=lambda r: (r.homepage_order, r.id))
+    rooms = (selected or [r for r in candidates if _room_has_upcoming_availability(r)])[:8]
+    slides = [r.image_url() for r in rooms if r.image_url()][:4]
     gallery = Attraction.query.filter_by(is_active=True).order_by(Attraction.created_at.desc()).limit(8).all()
     today_str = date.today().isoformat()
     tomorrow_str = (date.today() + timedelta(days=1)).isoformat()
@@ -1755,6 +1760,7 @@ def admin_add_room():
             bathrooms=request.form.get("bathrooms", 1, type=int),
             amenities=request.form.get("amenities", "").strip(),
             location=request.form.get("location", "").strip(),
+            homepage_order=max(0, request.form.get("homepage_order", 0, type=int) or 0),
             is_active=bool(request.form.get("is_active")),
         )
         _apply_room_specs_from_form(r, request.form)
@@ -1784,6 +1790,7 @@ def admin_edit_room(room_id):
         r.bathrooms = request.form.get("bathrooms", 1, type=int)
         r.amenities = request.form.get("amenities", "").strip()
         r.location = request.form.get("location", "").strip()
+        r.homepage_order = max(0, request.form.get("homepage_order", 0, type=int) or 0)
         r.is_active = bool(request.form.get("is_active"))
         _apply_room_specs_from_form(r, request.form)
         save_room_features(r, request.form)
@@ -2322,3 +2329,4 @@ def debug_cloudinary():
         "CLOUDINARY_API_SECRET": bool(CLOUDINARY_API_SECRET),
         "CLOUDINARY_ENABLED": CLOUDINARY_ENABLED,
     }
+

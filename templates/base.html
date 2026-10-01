@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>{% block title %}BookinRiga — Premium Hotel Booking{% endblock %}</title>
+<title>{% block title %}BookinRiga — Apartment Booking{% endblock %}</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}?v=4">
@@ -46,7 +46,7 @@
   </a>
   <div class="nav-links" id="navLinks">
     <a href="{{ url_for('index') }}">{% if lang=='lv' %}Sākums{% else %}Home{% endif %}</a>
-    <a href="{{ url_for('rooms') }}">{% if lang=='lv' %}Istabas{% else %}Rooms{% endif %}</a>
+    <a href="{{ url_for('rooms') }}">{% if lang=='lv' %}Istabas{% else %}Our Apartments{% endif %}</a>
     <a href="{{ url_for('attractions') }}">{% if lang=='lv' %}Apskates vietas{% else %}Attractions{% endif %}</a>
     <a href="{{ url_for('about') }}">{% if lang=='lv' %}Par mums{% else %}About{% endif %}</a>
     <a href="{{ url_for('contact') }}">{% if lang=='lv' %}Kontakti{% else %}Contact{% endif %}</a>
@@ -243,3 +243,4 @@
 {% block scripts %}{% endblock %}
 </body>
 </html>
+

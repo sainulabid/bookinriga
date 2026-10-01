@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% block title %}RigaNest — Comfortable Stays in Riga{% endblock %}
+{% block title %}BookinRiga — Comfortable Stays in Riga{% endblock %}
 
 {% block head %}
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css">
@@ -107,7 +107,7 @@
       </div>
 
       <div style="text-align:center;margin-top:44px">
-        <a href="{{ url_for('rooms') }}" class="btn-secondary">{% if lang=='lv' %}Skatīt visas istabas →{% else %}View All Rooms →{% endif %}</a>
+        <a href="{{ url_for('rooms') }}" class="btn-secondary">{% if lang=='lv' %}Skatīt visas istabas →{% else %}All Apartments →{% endif %}</a>
       </div>
     </div>
   </section>
@@ -117,7 +117,7 @@
     <div class="container">
       <div class="section-head">
         <p class="section-label">{% if lang=='lv' %}Ieskatieties{% else %}Take A Look{% endif %}</p>
-        <h2 class="section-title">{% if lang=='lv' %}RigaNest iekšpusē{% else %}Inside RigaNest{% endif %}</h2>
+        <h2 class="section-title">{% if lang=='lv' %}BookinRiga iekšpusē{% else %}Inside BookinRiga{% endif %}</h2>
       </div>
       {% if gallery %}
       <div class="home-gallery">
@@ -141,12 +141,12 @@
   <section style="background:var(--off-white)">
     <div class="container" style="text-align:center">
       <p class="section-label">{% if lang=='lv' %}Biedru priekšrocības{% else %}Member Benefits{% endif %}</p>
-      <h2 class="section-title">{% if lang=='lv' %}Pievienojieties RigaNest, ietaupiet katrā uzturēšanās reizē{% else %}Join RigaNest, save on every stay{% endif %}</h2>
+      <h2 class="section-title">{% if lang=='lv' %}Pievienojieties BookinRiga, ietaupiet katrā uzturēšanās reizē{% else %}Join BookinRiga, save on every stay{% endif %}</h2>
       <p class="section-sub" style="margin:0 auto 28px">{% if lang=='lv' %}Izveidojiet bezmaksas kontu biedru cenām, ātrākai norēķināšanās un drošai e-pasta verificētai pieteikšanās.{% else %}Create a free account for member rates, faster checkout and secure email-verified login.{% endif %}</p>
       {% if not current_user.is_authenticated %}
       <a href="{{ url_for('register') }}" class="btn-primary">{% if lang=='lv' %}Izveidot bezmaksas kontu{% else %}Create Free Account{% endif %}</a>
       {% else %}
-      <a href="{{ url_for('rooms') }}" class="btn-primary">{% if lang=='lv' %}Pārlūkot istabas{% else %}Browse Rooms{% endif %}</a>
+      <a href="{{ url_for('rooms') }}" class="btn-primary">{% if lang=='lv' %}Pārlūkot istabas{% else %}Browse Apartments{% endif %}</a>
       {% endif %}
     </div>
   </section>
@@ -180,20 +180,22 @@
       return y + '-' + m + '-' + day;
     }
 
-    var fp = flatpickr(ciEl, {
-      mode: 'range',
-      minDate: 'today',
-      dateFormat: 'Y-m-d',
-      showMonths: 2,
-      disableMobile: true,
-      onChange: function(selectedDates){
-        if (selectedDates.length >= 1) ciEl.value = fmt(selectedDates[0]);
-        if (selectedDates.length === 2) coEl.value = fmt(selectedDates[1]);
+    var co = flatpickr(coEl, {
+      minDate: '{{ tomorrow }}', dateFormat: 'Y-m-d', disableMobile: true
+    });
+    var ci = flatpickr(ciEl, {
+      minDate: 'today', dateFormat: 'Y-m-d', disableMobile: true,
+      onChange: function(dates) {
+        if (!dates.length) { co.clear(); return; }
+        var next = new Date(dates[0]);
+        next.setDate(next.getDate() + 1);
+        co.set('minDate', fmt(next));
+        if (co.selectedDates.length && co.selectedDates[0] <= dates[0]) co.clear();
+        co.open();
       }
     });
 
-    // Clicking the check-out field opens the same range calendar
-    coEl.addEventListener('click', function(){ fp.open(); });
   })();
 </script>
 {% endblock %}
+

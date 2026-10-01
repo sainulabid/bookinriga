@@ -88,7 +88,7 @@ def sync_room_specs(access_token, room):
     if not info:
         return False
 
-    room.bed_type = _first_present(info, ["unitType", "roomType", "type"], room.bed_type or "")
+    # Accommodation type is not a bed type. Preserve the manually verified bed description.
     room.max_adults = int(_first_present(info, ["maxAdult", "maxAdults"], room.max_adults or 2))
     room.max_children = int(_first_present(info, ["maxChildren", "maxChild"], room.max_children or 0))
     room.min_stay = int(_first_present(info, ["minStay", "minPeriod"], room.min_stay or 1))
@@ -385,3 +385,4 @@ if __name__ == "__main__":
         main_amenities()
     else:
         main()
+

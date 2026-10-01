@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% block title %}My Bookings — RigaNest{% endblock %}
+{% block title %}My Bookings — BookinRiga{% endblock %}
 
 {% block content %}
 <div class="page page-wrap">
@@ -50,9 +50,10 @@
     <div class="empty-state">
       <h3>{% if lang=='lv' %}Vēl nav rezervāciju{% else %}No bookings yet{% endif %}</h3>
       <p>{% if lang=='lv' %}Kad rezervēsiet istabu, tā parādīsies šeit.{% else %}When you reserve a room it will appear here.{% endif %}</p>
-      <a href="{{ url_for('rooms') }}" class="btn-primary" style="margin-top:18px">{% if lang=='lv' %}Pārlūkot istabas{% else %}Browse Rooms{% endif %}</a>
+      <a href="{{ url_for('rooms') }}" class="btn-primary" style="margin-top:18px">{% if lang=='lv' %}Pārlūkot istabas{% else %}Browse Apartments{% endif %}</a>
     </div>
     {% endif %}
   </div>
 </div>
 {% endblock %}
+

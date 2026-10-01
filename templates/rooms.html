@@ -1,12 +1,12 @@
 {% extends "base.html" %}
-{% block title %}Rooms — RigaNest{% endblock %}
+{% block title %}All Apartments — BookinRiga{% endblock %}
 
 {% block content %}
 <div class="page page-wrap">
   <div class="page-hero-sm" style="background:linear-gradient(135deg,rgb(0, 74, 170),rgb(26, 115, 232));padding:60px 0;color:#fff">
     <div class="container">
       <div class="breadcrumb" style="color:rgba(255,255,255,0.6);font-size:13px;margin-bottom:10px">
-        <a href="{{ url_for('index') }}" style="color:var(--gold)">{% if lang=='lv' %}Sākums{% else %}Home{% endif %}</a> / {% if lang=='lv' %}Istabas{% else %}Rooms{% endif %}
+        <a href="{{ url_for('index') }}" style="color:var(--gold)">{% if lang=='lv' %}Sākums{% else %}Home{% endif %}</a> / {% if lang=='lv' %}Istabas{% else %}Our Apartments{% endif %}
       </div>
       <h1 style="color:#fff;font-size:38px">{% if lang=='lv' %}Mūsu apartamenti{% else %}Our Apartments{% endif %}</h1>
     </div>
@@ -46,7 +46,7 @@
       <div style="background:#fdecea;color:#b3261e;border:1px solid #f5c6c2;border-radius:var(--radius);padding:12px 18px;font-size:14px;margin-bottom:24px">⚠️ {{ date_error }}</div>
       {% elif check_in and check_out %}
       <p style="color:var(--gray-500);font-size:14px;margin-bottom:24px">
-        {% if lang=='lv' %}✅ Rāda pieejamās istabas no <strong>{{ check_in }}</strong> līdz <strong>{{ check_out }}</strong>{% else %}✅ Showing rooms available from <strong>{{ check_in }}</strong> to <strong>{{ check_out }}</strong>{% endif %}
+        {% if lang=='lv' %}✅ Rāda pieejamās istabas no <strong>{{ check_in }}</strong> līdz <strong>{{ check_out }}</strong>{% else %}✅ Showing apartments available from <strong>{{ check_in }}</strong> to <strong>{{ check_out }}</strong>{% endif %}
       </p>
       {% endif %}
 
@@ -77,9 +77,10 @@
         {% endfor %}
       </div>
       {% else %}
-      <div class="empty-state"><h3>{% if lang=='lv' %}Nav istabu, kas atbilst jūsu filtriem{% else %}No rooms match your filters{% endif %}</h3><p>{% if lang=='lv' %}Mēģiniet paplašināt meklēšanu.{% else %}Try widening your search.{% endif %}</p></div>
+      <div class="empty-state"><h3>{% if lang=='lv' %}Nav istabu, kas atbilst jūsu filtriem{% else %}No apartments match your filters{% endif %}</h3><p>{% if lang=='lv' %}Mēģiniet paplašināt meklēšanu.{% else %}Try widening your search.{% endif %}</p></div>
       {% endif %}
     </div>
   </section>
 </div>
 {% endblock %}
+

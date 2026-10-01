@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% block title %}{{ 'Edit' if room else 'Add' }} Room — RigaNest{% endblock %}
+{% block title %}{{ 'Edit' if room else 'Add' }} Room — BookinRiga{% endblock %}
 
 {% block content %}
 <div class="page page-wrap">
@@ -10,7 +10,7 @@
     <form method="post" enctype="multipart/form-data" style="background:#fff;border:1px solid var(--gray-100);border-radius:var(--radius-lg);padding:30px;box-shadow:var(--shadow-sm)">
       <div class="form-group"><label>Room name *</label><input type="text" name="name" required value="{{ room.name if room else '' }}"></div>
       <div class="form-row">
-        <div class="form-group"><label>Type</label><input type="text" name="room_type" placeholder="Suite, Deluxe…" value="{{ room.room_type if room else '' }}"></div>
+        <div class="form-group"><label>Type</label><input type="text" name="room_type" placeholder="Apartment" value="{{ room.room_type if room else '' }}"></div>
         <div class="form-group"><label>Price / night (€) *</label><input type="number" step="0.01" name="price" required value="{{ room.price if room else '' }}"></div>
       </div>
       <div class="form-row-3" style="display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:14px">
@@ -20,11 +20,11 @@
         <div class="form-group"><label>Size (m²)</label><input type="number" name="size_sqm" min="1" value="{{ room.size_sqm if room else 30 }}"></div>
       </div>
 
-      <!-- ROOM SPECIFICATIONS — shown on the public room page's "Room Specifications" card.
+      <!-- ROOM SPECIFICATIONS — shown on the public room page's "Apartment Specifications" card.
            Defaults come from the Beds24 specs sync; saving this form locks these fields
            (specs_manual_override) so future Beds24 syncs won't overwrite your edits. -->
       <div class="form-group">
-        <label>Room Specifications</label>
+        <label>Apartment Specifications</label>
         <p style="font-size:12px;color:var(--gray-500);margin:-2px 0 14px">
           {% if room and room.specs_manual_override %}
             ✓ Manually set — Beds24 sync will not overwrite these.
@@ -43,7 +43,7 @@
         </div>
       </div>
 
-      <div class="form-group"><label>Amenities highlight (comma separated, shown on room cards)</label><input type="text" name="amenities" placeholder="Sea View, WiFi, Breakfast" value="{{ room.amenities if room else '' }}"></div>
+      <div class="form-group"><label>Amenities highlight (comma separated, shown on room cards)</label><input type="text" name="amenities" placeholder="WiFi, Heating, Kitchen" value="{{ room.amenities if room else '' }}"></div>
 
       <div class="form-group">
         <label>Features</label>
@@ -62,6 +62,7 @@
         {% endfor %}
       </div>
 
+      <div class="form-group"><label>Homepage order (0 = automatic; 1, 2, 3… = chosen order)</label><input type="number" min="0" name="homepage_order" value="{{ room.homepage_order if room else 0 }}"><p>Select a positive number for each apartment you want featured. Use Active to hide an apartment without deleting bookings.</p></div>
       <div class="form-group"><label>Location (for the map)</label><input type="text" name="location" placeholder="Riga Old Town, Latvia" value="{{ room.location if room else '' }}"></div>
       <div class="form-group"><label>Description</label><textarea name="description">{{ room.description if room else '' }}</textarea></div>
 
@@ -119,3 +120,4 @@
   });
 </script>
 {% endblock %}
+

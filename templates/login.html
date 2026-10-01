@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% block title %}Sign In — RigaNest{% endblock %}
+{% block title %}Sign In — BookinRiga{% endblock %}
 
 {% block content %}
 <div class="page page-wrap">
@@ -42,10 +42,11 @@
         </a>
         {% endif %}
         <div class="auth-footer-link" style="text-align:center;margin-top:18px;font-size:14px;color:var(--gray-500)">
-          {% if lang=='lv' %}Vēl neesat RigaNest? <a href="{{ url_for('register') }}" style="color:var(--primary);font-weight:600">Izveidot bezmaksas kontu</a>{% else %}New to RigaNest? <a href="{{ url_for('register') }}" style="color:var(--primary);font-weight:600">Create a free account</a>{% endif %}
+          {% if lang=='lv' %}Vēl neesat BookinRiga? <a href="{{ url_for('register') }}" style="color:var(--primary);font-weight:600">Izveidot bezmaksas kontu</a>{% else %}New to BookinRiga? <a href="{{ url_for('register') }}" style="color:var(--primary);font-weight:600">Create a free account</a>{% endif %}
         </div>
       </div>
     </div>
   </div>
 </div>
 {% endblock %}
+
