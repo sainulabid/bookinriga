@@ -320,6 +320,13 @@ class Booking(db.Model):
     stripe_session_id = db.Column(db.String(255), default="")
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     beds24_booking_id = db.Column(db.Integer, nullable=True)
+    payment_verified = db.Column(db.Boolean, default=False)
+    payment_live = db.Column(db.Boolean, default=False)
+    beds24_reference = db.Column(db.String(100), default="")
+    beds24_sync_state = db.Column(db.String(40), default="not_requested")
+    beds24_sync_error = db.Column(db.String(255), default="")
+    beds24_attempted_at = db.Column(db.DateTime, nullable=True)
+    cancel_requested = db.Column(db.Boolean, default=False)
 
     def nights(self):
         return (self.check_out - self.check_in).days
@@ -1061,15 +1068,39 @@ def checkout(booking_id):
     if bk.user_id != current_user.id:
         abort(403)
 
+    if bk.status == "Cancelled" or bk.cancel_requested:
+        abort(409)
+    if bk.payment_verified:
+        return redirect(url_for("booking_success", booking_id=bk.id))
     if PAYMENTS_LIVE and stripe:
+        from beds24_booking import cents
         try:
+            # Verify the token, exact room access and current Beds24 availability
+            # before asking a guest to pay for a real reservation.
+            if bk.stripe_session_id:
+                existing = stripe.checkout.Session.retrieve(bk.stripe_session_id)
+                if existing.get("payment_status") == "paid":
+                    return redirect(url_for("booking_success", booking_id=bk.id))
+                if existing.get("status") == "open":
+                    if STRIPE_SECRET_KEY.startswith("sk_live_"):
+                        from beds24_booking import preflight
+                        preflight(bk)
+                    return redirect(existing.url, code=303)
+                flash("This checkout has ended. Please start a new booking or contact us.", "info")
+                return redirect(url_for("dashboard"))
+            if STRIPE_SECRET_KEY.startswith("sk_live_"):
+                from beds24_booking import preflight
+                preflight(bk)
             sess = stripe.checkout.Session.create(
                 mode="payment",
+                idempotency_key="bookinriga-checkout-" + str(bk.id) + "-" + bk.created_at.isoformat(),
+                client_reference_id=str(bk.id),
+                metadata={"booking_id": str(bk.id)},
                 line_items=[{
                     "price_data": {
                         "currency": "eur",
                         "product_data": {"name": f"{bk.room.name} ({bk.nights()} nights)"},
-                        "unit_amount": int(bk.total_price * 100),
+                        "unit_amount": cents(bk.total_price),
                     },
                     "quantity": 1,
                 }],
@@ -1081,7 +1112,7 @@ def checkout(booking_id):
             db.session.commit()
             return redirect(sess.url, code=303)
         except Exception as e:
-            flash(f"Payment error: {e}", "error")
+            flash("Online booking is temporarily unavailable for these dates. Please contact us before paying.", "error")
             return redirect(url_for("dashboard"))
 
     return render_template("checkout_demo.html", booking=bk,
@@ -1181,21 +1212,47 @@ def booking_success(booking_id):
     bk = Booking.query.get_or_404(booking_id)
     if bk.user_id != current_user.id:
         abort(403)
-    bk.status = "Confirmed"
-    bk.payment_status = "Paid"
-    db.session.commit()
-
-    if not bk.beds24_booking_id:
+    from beds24_booking import accept_payment, sync_booking, SyncError
+    if PAYMENTS_LIVE and stripe and not bk.payment_verified and not bk.beds24_booking_id:
         try:
-            from beds24_booking import push_booking
-            new_id = push_booking(bk)
-            if new_id:
-                bk.beds24_booking_id = new_id
-                db.session.commit()
-        except Exception as e:
-            print(f"[beds24] Could not push booking #{bk.id}: {e}")
-
+            if not bk.stripe_session_id:
+                raise SyncError("payment_not_verified")
+            checkout = stripe.checkout.Session.retrieve(bk.stripe_session_id)
+            accept_payment(bk, checkout)
+        except Exception:
+            flash("Payment has not been verified yet. Please check your booking status or contact us.", "info")
+            return redirect(url_for("dashboard"))
+    elif not PAYMENTS_LIVE and not bk.payment_verified:
+        # Demo checkout stays local and never blocks real Beds24 inventory.
+        if bk.status == "Cancelled":
+            return redirect(url_for("dashboard"))
+        bk.status, bk.payment_status, bk.beds24_sync_state = "Confirmed", "Demo", "demo"
+        db.session.commit()
+    if bk.payment_verified and bk.payment_live:
+        sync_booking(bk.id)
     return render_template("booking_success.html", booking=bk)
+
+
+@app.route("/webhooks/stripe", methods=["POST"])
+def stripe_webhook():
+    secret = os.environ.get("STRIPE_WEBHOOK_SECRET", "")
+    if not stripe or not secret:
+        return {"error": "Webhook is not configured"}, 503
+    try:
+        event = stripe.Webhook.construct_event(request.get_data(), request.headers.get("Stripe-Signature", ""), secret)
+    except Exception:
+        return {"error": "Invalid signature"}, 400
+    if event["type"] in ("checkout.session.completed", "checkout.session.async_payment_succeeded"):
+        checkout = event["data"]["object"]
+        bk = Booking.query.filter_by(stripe_session_id=checkout["id"]).first()
+        if bk and checkout.get("payment_status") == "paid":
+            from beds24_booking import accept_payment, SyncError
+            try:
+                accept_payment(bk, checkout)
+            except SyncError:
+                return {"error": "Payment does not match booking"}, 400
+    # Durable queue is committed before acknowledging Stripe; worker exports it.
+    return {"received": True}
 
 
 @app.route("/booking/<int:booking_id>/cancel")
@@ -1204,10 +1261,20 @@ def booking_cancel(booking_id):
     bk = Booking.query.get_or_404(booking_id)
     if bk.user_id != current_user.id:
         abort(403)
-    if bk.payment_status == "Unpaid":
-        db.session.delete(bk)
+    if not bk.payment_verified and bk.payment_status == "Unpaid":
+        if stripe and bk.stripe_session_id:
+            try:
+                checkout = stripe.checkout.Session.retrieve(bk.stripe_session_id)
+                if checkout.get("payment_status") == "paid":
+                    return redirect(url_for("booking_success", booking_id=bk.id))
+                if checkout.get("status") == "open":
+                    stripe.checkout.Session.expire(bk.stripe_session_id)
+            except Exception:
+                flash("Could not confirm payment cancellation. Please try again.", "error")
+                return redirect(url_for("dashboard"))
+        bk.status = "Cancelled"
         db.session.commit()
-        flash("Payment cancelled — booking not saved.", "info")
+        flash("Payment cancelled.", "info")
     return redirect(url_for("room_detail", room_id=bk.room_id))
 
 
@@ -1221,21 +1288,66 @@ def dashboard():
 @app.route("/booking/<int:booking_id>/cancel-confirmed", methods=["POST"])
 @login_required
 def cancel_confirmed(booking_id):
+    verify_booking_csrf()
     bk = Booking.query.get_or_404(booking_id)
     if bk.user_id != current_user.id and not current_user.is_admin:
         abort(403)
-    bk.status = "Cancelled"
-    db.session.commit()
+    if bk.status == "Cancelled":
+        return redirect(url_for("dashboard"))
+    if bk.payment_live or bk.beds24_booking_id:
+        if bk.beds24_booking_id and not bk.payment_verified:
+            flash("Please contact us to cancel this reservation through its original booking channel.", "info")
+            return redirect(url_for("dashboard"))
+        bk.cancel_requested = True
+        if bk.beds24_sync_state not in ("working", "ambiguous"):
+            bk.beds24_sync_state = "pending"
+        db.session.commit()
+        from beds24_booking import sync_booking
+        sync_booking(bk.id)
+        flash("Booking cancelled." if bk.status == "Cancelled" else "Cancellation requested. We will confirm it once processed.", "info")
+    else:
+        bk.status = "Cancelled"
+        db.session.commit()
+        flash("Booking cancelled.", "success")
+    return redirect(url_for("dashboard"))
 
-    if bk.beds24_booking_id:
-        try:
-            from beds24_booking import cancel_booking
-            cancel_booking(bk)
-        except Exception as e:
-            print(f"[beds24] Could not cancel booking #{bk.id}: {e}")
 
-    flash("Booking cancelled.", "success")
-    return redirect(request.referrer or url_for("dashboard"))
+@app.context_processor
+def booking_csrf_context():
+    if "booking_csrf_token" not in session:
+        session["booking_csrf_token"] = secrets.token_urlsafe(32)
+    return {"booking_csrf_token": session["booking_csrf_token"]}
+
+
+def verify_booking_csrf():
+    expected = session.get("booking_csrf_token", "")
+    supplied = request.form.get("csrf_token", "")
+    if not expected or not secrets.compare_digest(expected, supplied):
+        abort(400)
+
+
+@app.route("/admin/booking-export/status")
+@admin_required
+def booking_export_status():
+    from beds24_booking import connection_status
+    state = connection_status()
+    state["stripe_live"] = STRIPE_SECRET_KEY.startswith("sk_live_")
+    state["stripe_webhook_configured"] = bool(os.environ.get("STRIPE_WEBHOOK_SECRET"))
+    state["queue"] = [{"booking_id": b.id, "state": b.beds24_sync_state,
+        "error": b.beds24_sync_error, "beds24_booking_id": b.beds24_booking_id}
+        for b in Booking.query.filter(Booking.beds24_sync_state.in_(["pending", "error", "ambiguous", "working", "manual_review"])).all()]
+    return state
+
+
+@app.route("/admin/bookings/<int:booking_id>/retry-export", methods=["POST"])
+@admin_required
+def retry_booking_export(booking_id):
+    verify_booking_csrf()
+    bk = Booking.query.get_or_404(booking_id)
+    from beds24_booking import sync_booking
+    sync_booking(bk.id)
+    flash("Booking export status checked.", "info")
+    return redirect(url_for("admin_bookings"))
 
 
 # ----------------------------------------------------------------------
@@ -1331,6 +1443,19 @@ def ensure_beds24_scheduler():
                 # Retry failed calls after ten minutes without hitting rate limits.
                 threading.Event().wait(600 if _beds24_sync_state["status"] == "error" else 1800)
 
+        def run_booking_queue():
+            from beds24_booking import process_queue, connection_status
+            with app.app_context():
+                app.logger.warning("[booking-export] connection=%s", connection_status())
+            while True:
+                try:
+                    with app.app_context():
+                        process_queue()
+                except Exception:
+                    app.logger.warning("[booking-export] queue check failed; will retry")
+                threading.Event().wait(60)
+
+        threading.Thread(target=run_booking_queue, daemon=True, name="beds24-booking-queue").start()
         threading.Thread(target=run, daemon=True, name="beds24-auto-sync").start()
         _beds24_scheduler_started = True
 

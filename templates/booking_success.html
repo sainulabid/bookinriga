@@ -1,12 +1,12 @@
 {% extends "base.html" %}
-{% block title %}Booking Confirmed — BookinRiga{% endblock %}
+{% block title %}Booking Status — BookinRiga{% endblock %}
 
 {% block content %}
 <div class="page page-wrap">
   <div class="container" style="padding-top:60px;max-width:560px;text-align:center">
     <div style="width:84px;height:84px;border-radius:50%;background:var(--success-soft);color:var(--success);font-size:42px;display:flex;align-items:center;justify-content:center;margin:0 auto 24px">✓</div>
-    <h1 style="font-size:34px;margin-bottom:10px">{% if lang=='lv' %}Rezervācija apstiprināta!{% else %}Booking confirmed!{% endif %}</h1>
-    <p style="color:var(--gray-500);margin-bottom:30px">{% if lang=='lv' %}Apstiprinājums ir saglabāts jūsu kontā.{% else %}A confirmation has been saved to your account.{% endif %}</p>
+    <h1 style="font-size:34px;margin-bottom:10px">{% if booking.status=='Cancelled' %}Booking cancelled{% elif booking.beds24_sync_state=='demo' %}Demo booking saved{% elif booking.status=='Confirmed' %}{% if lang=='lv' %}Rezervācija apstiprināta!{% else %}Booking confirmed!{% endif %}{% else %}Payment received — confirmation pending{% endif %}</h1>
+    <p style="color:var(--gray-500);margin-bottom:30px">{% if booking.beds24_sync_state=='demo' %}This test booking has not been sent to the property.{% elif booking.status=='Pending' %}Your payment is recorded. We are processing the reservation with the property. Please check My Bookings or contact us for confirmation.{% else %}{% if lang=='lv' %}Apstiprinājums ir saglabāts jūsu kontā.{% else %}A confirmation has been saved to your account.{% endif %}{% endif %}</p>
 
     <div style="background:#fff;border:1px solid var(--gray-100);border-radius:var(--radius-lg);padding:28px;box-shadow:var(--shadow-sm);text-align:left">
       <div style="display:flex;justify-content:space-between;margin-bottom:12px">
@@ -22,9 +22,12 @@
       <div style="display:flex;justify-content:space-between;margin-bottom:12px">
         <span style="color:var(--gray-500)">{% if lang=='lv' %}Maksājums{% else %}Payment{% endif %}</span><span class="badge badge-green">{{ booking.payment_status }}</span>
       </div>
+      {% if booking.beds24_booking_id %}
+      <div style="display:flex;justify-content:space-between;margin-bottom:12px"><span>Property booking reference</span><strong>{{ booking.beds24_booking_id }}</strong></div>
+      {% endif %}
       <hr style="border:none;border-top:1px solid var(--gray-100);margin:14px 0">
       <div style="display:flex;justify-content:space-between;font-weight:700;font-size:20px">
-        <span>{% if lang=='lv' %}Kopā samaksāts{% else %}Total paid{% endif %}</span><span class="room-price">€{{ '%.0f'|format(booking.total_price) }}</span>
+        <span>{% if booking.beds24_sync_state=='demo' %}Demo total{% else %}{% if lang=='lv' %}Kopā samaksāts{% else %}Total paid{% endif %}{% endif %}</span><span class="room-price">€{{ '%.0f'|format(booking.total_price) }}</span>
       </div>
     </div>
 

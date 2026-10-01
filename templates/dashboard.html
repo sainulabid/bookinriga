@@ -37,7 +37,7 @@
           </td>
           <td>
             {% if b.status=='Confirmed' and b.check_in >= today %}
-            <form method="post" action="{{ url_for('cancel_confirmed', booking_id=b.id) }}" onsubmit="return confirm('{% if lang=='lv' %}Atcelt šo rezervāciju?{% else %}Cancel this booking?{% endif %}');">
+            <form method="post" action="{{ url_for('cancel_confirmed', booking_id=b.id) }}" onsubmit="return confirm('{% if lang=='lv' %}Atcelt šo rezervāciju?{% else %}Cancel this booking?{% endif %}');"><input type="hidden" name="csrf_token" value="{{ booking_csrf_token }}">
               <button class="btn-sm" style="background:var(--danger-soft);color:var(--danger);border:none;padding:6px 14px;border-radius:var(--radius);font-weight:600;cursor:pointer">{% if lang=='lv' %}Atcelt{% else %}Cancel{% endif %}</button>
             </form>
             {% endif %}

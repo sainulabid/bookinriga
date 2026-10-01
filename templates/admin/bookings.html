@@ -19,7 +19,7 @@
 
     {% if bookings %}
     <table class="admin-table">
-      <thead><tr><th>#</th><th>Guest</th><th>Phone</th><th>Room</th><th>Dates</th><th>Total</th><th>Payment</th><th>Status</th><th></th></tr></thead>
+      <thead><tr><th>#</th><th>Guest</th><th>Phone</th><th>Room</th><th>Dates</th><th>Total</th><th>Payment</th><th>Status</th><th>Beds24</th><th></th></tr></thead>
       <tbody>
         {% for b in bookings %}
         <tr>
@@ -36,8 +36,19 @@
             {% else %}<span class="badge badge-red">Cancelled</span>{% endif %}
           </td>
           <td>
+            {% if b.beds24_booking_id %}<strong>#{{ b.beds24_booking_id }}</strong><br>{% endif %}
+            {{ b.beds24_sync_state }}
+            {% if b.beds24_sync_error %}<br><small>{{ b.beds24_sync_error }}</small>{% endif %}
+            {% if b.beds24_sync_state in ['pending','error','ambiguous'] %}
+            <form method="post" action="{{ url_for('retry_booking_export', booking_id=b.id) }}">
+              <input type="hidden" name="csrf_token" value="{{ booking_csrf_token }}">
+              <button class="btn-sm" type="submit">Check / retry</button>
+            </form>
+            {% endif %}
+          </td>
+          <td>
             {% if b.status=='Confirmed' %}
-            <form method="post" action="{{ url_for('cancel_confirmed', booking_id=b.id) }}" onsubmit="return confirm('Cancel?');">
+            <form method="post" action="{{ url_for('cancel_confirmed', booking_id=b.id) }}" onsubmit="return confirm('Cancel?');"><input type="hidden" name="csrf_token" value="{{ booking_csrf_token }}">
               <button class="btn-sm" style="background:var(--danger-soft);color:var(--danger);border:none;padding:6px 12px;border-radius:var(--radius);font-weight:600;cursor:pointer">Cancel</button>
             </form>
             {% endif %}
