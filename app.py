@@ -1351,6 +1351,10 @@ def _run_beds24_sync_background():
         _beds24_sync_state["log"] = buf.getvalue().splitlines()
         _beds24_sync_state["finished_at"] = datetime.utcnow().isoformat()
         _beds24_sync_state["running"] = False
+        app.logger.warning("Beds24 sync finished: %s", _beds24_sync_state["status"])
+        for line in _beds24_sync_state["log"]:
+            if line.startswith("[catalog]") or line.startswith("ERROR: Could not get Beds24") or line.startswith("ERROR: Beds24") or line.startswith("ERROR: Calendar fetch failed") or line.startswith("ERROR: No calendar data"):
+                app.logger.warning("Beds24 sync: %s", line)
 
 
 @app.route("/admin/run-beds24-sync")
