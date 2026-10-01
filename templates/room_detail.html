@@ -314,7 +314,7 @@
       <!-- RIGHT SIDEBAR: BOOK BOX + RELATED ROOMS -->
       <div style="position:sticky;top:90px">
         <div class="summary-card" style="background:#fff;border:1px solid var(--gray-100);border-radius:var(--radius-lg);padding:28px;box-shadow:var(--shadow-md)">
-          <div class="room-price" style="font-size:32px">€{{ '%.0f'|format(room.price) }}<span style="font-size:15px">{% if lang=='lv' %}/naktī{% else %}/night{% endif %}</span></div>
+          <div class="room-price" style="font-size:32px">{% if room.price > 0 %}€{{ '%.0f'|format(room.price) }}{% else %}{% if lang=='lv' %}Jautājiet cenu{% else %}Contact for rates{% endif %}{% endif %}{% if room.price > 0 %}<span style="font-size:15px">{% if lang=='lv' %}/naktī{% else %}/night{% endif %}</span>{% endif %}</div>
           <p style="color:var(--gray-500);font-size:14px;margin:8px 0 20px">{% if lang=='lv' %}Nodokļi un maksas tiek aprēķinātas norēķinoties.{% else %}Taxes & fees calculated at checkout.{% endif %}</p>
 
           <!-- INLINE BOOK NOW FORM — dates are set by clicking the calendar on the left, not typed here -->
@@ -336,7 +336,7 @@
               </select>
             </div>
             <div id="ibSummaryLine" style="color:var(--gray-500);font-size:13px;margin-bottom:12px">{% if lang=='lv' %}Izvēlieties datumus kalendārā, lai redzētu kopsummu{% else %}Pick dates on the calendar to see the total{% endif %}</div>
-            <button type="submit" class="btn-primary btn-full">{% if lang=='lv' %}Rezervēt tagad{% else %}Book Now{% endif %}</button>
+            <button type="submit" class="btn-primary btn-full" {% if room.price <= 0 %}disabled{% endif %}>{% if lang=='lv' %}Rezervēt tagad{% else %}Book Now{% endif %}</button>
           </form>
           <div style="text-align:center;margin-top:14px"><span class="pay-badge">🔒 {% if lang=='lv' %}Drošs Stripe norēķins{% else %}Secure Stripe checkout{% endif %}</span></div>
 
@@ -447,6 +447,7 @@
   (function(){
     var bookedRanges = {{ booked_ranges|default([])|tojson }};
     var pricePerNight = {{ room.price }};
+    var nightlyPrices = {{ nightly_prices|default({})|tojson }};
     var minStay = {{ room.min_stay or 1 }};
     var maxStay = {{ room.max_stay or 365 }};
     var lang = {{ (lang == 'lv')|tojson }};
@@ -516,10 +517,13 @@
       }
       if (selectedCheckIn && selectedCheckOut) {
         var nights = Math.round((selectedCheckOut - selectedCheckIn) / 86400000);
-        var total = nights * pricePerNight;
+        var total = 0;
+        for (var day = new Date(selectedCheckIn); day < selectedCheckOut; day.setDate(day.getDate() + 1)) {
+          total += Number(nightlyPrices[fmt(day)] || pricePerNight);
+        }
         var nightsWord = lang ? 'naktis' : ('night' + (nights > 1 ? 's' : ''));
         summaryTotal.textContent = '€' + total.toFixed(0) + ' (' + nights + ' ' + nightsWord + ')';
-        ibSummaryLine.textContent = '€' + pricePerNight.toFixed(0) + ' × ' + nights + ' ' + nightsWord + ' = €' + total.toFixed(0);
+        ibSummaryLine.textContent = nights + ' ' + nightsWord + ' = €' + total.toFixed(0);
       } else {
         summaryTotal.textContent = '—';
         ibSummaryLine.textContent = lang ? 'Izvēlieties datumus kalendārā, lai redzētu kopsummu' : 'Pick dates on the calendar to see the total';
@@ -667,4 +671,3 @@
   })();
 </script>
 {% endblock %}
-

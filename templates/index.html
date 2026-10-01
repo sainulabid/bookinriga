@@ -98,7 +98,7 @@
               {% for a in room.amenity_list()[:3] %}<span class="amenity-tag">{{ a }}</span>{% endfor %}
             </div>
             <div class="room-footer">
-              <div class="room-price">€{{ '%.0f'|format(room.price) }}<span>/night</span></div>
+              <div class="room-price">{% if room.price > 0 %}€{{ '%.0f'|format(room.price) }}{% else %}{% if lang=='lv' %}Jautājiet cenu{% else %}Contact for rates{% endif %}{% endif %}{% if room.price > 0 %}<span>/night</span>{% endif %}</div>
               <div class="room-stars">★ {{ '%.1f'|format(room.rating) }}</div>
             </div>
           </div>

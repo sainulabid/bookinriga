@@ -22,6 +22,7 @@ import cloudinary.uploader
 import random
 import smtplib
 import requests
+import threading
 from email.mime.text import MIMEText
 from datetime import datetime, date, timedelta
 import secrets
@@ -264,6 +265,8 @@ class Room(db.Model):
         return url_for("static", filename="uploads/" + self.image)
 
     def amenity_list(self):
+        if self.beds24_property_id == 341384:
+            return [a.strip() for a in (self.amenities or "").split(",") if a.strip()]
         return [a.strip() for a in self.amenities.split(",")
                 if a.strip() and a.strip().lower() not in {"ac", "air conditioning", "air-conditioning", "breakfast", "breakfast available", "breakfast kit"}]
 
@@ -463,6 +466,19 @@ def parse_date(v):
 
 
 def is_available(room_id, ci, co, exclude=None):
+    room = db.session.get(Room, room_id)
+    if not room or not room.is_active:
+        return False
+    if room.beds24_property_id == 341384:
+        # Unknown dates and missing rates must not look bookable.
+        nights = (co - ci).days
+        count = RoomAvailability.query.filter(
+            RoomAvailability.room_id == room_id,
+            RoomAvailability.date >= ci, RoomAvailability.date < co,
+            RoomAvailability.available.is_(True), RoomAvailability.price > 0,
+        ).count()
+        if nights <= 0 or count != nights:
+            return False
     q = Booking.query.filter(
         Booking.room_id == room_id,
         Booking.status.in_(["Confirmed", "Pending"]),
@@ -666,7 +682,7 @@ def index():
     candidates.sort(key=lambda r: (not _room_has_upcoming_availability(r), -r.rating))
     selected = sorted([r for r in candidates if r.homepage_order and r.homepage_order > 0],
                       key=lambda r: (r.homepage_order, r.id))
-    rooms = (selected or [r for r in candidates if _room_has_upcoming_availability(r)])[:8]
+    rooms = (selected or [r for r in candidates if _room_has_upcoming_availability(r)] or candidates)[:8]
     slides = [r.image_url() for r in rooms if r.image_url()][:4]
     gallery = Attraction.query.filter_by(is_active=True).order_by(Attraction.created_at.desc()).limit(8).all()
     today_str = date.today().isoformat()
@@ -719,7 +735,7 @@ def rooms():
                     RoomAvailability.date < check_out,
                     RoomAvailability.available.is_(False),
                 ).first()
-                if not blocked:
+                if not blocked and is_available(r.id, check_in, check_out):
                     available.append(r)
         listings = available
     else:
@@ -736,6 +752,8 @@ def rooms():
 @app.route("/room/<int:room_id>")
 def room_detail(room_id):
     room = Room.query.get_or_404(room_id)
+    if not room.is_active:
+        abort(404)
     booked = [{"from": b.check_in.isoformat(), "to": b.check_out.isoformat()}
               for b in room.bookings if b.status in ("Confirmed", "Pending")]
 
@@ -748,6 +766,18 @@ def room_detail(room_id):
             RoomAvailability.available.is_(False),
         ).order_by(RoomAvailability.date).all()
     ]
+    nightly_rows = RoomAvailability.query.filter(
+        RoomAvailability.room_id == room.id,
+        RoomAvailability.date >= date.today(),
+    ).all()
+    nightly_prices = {r.date.isoformat(): r.price for r in nightly_rows
+                      if r.available and r.price and r.price > 0}
+    if room.beds24_property_id == 341384:
+        # Unsynced/no-rate dates are unknown, never display them as free.
+        blocked_dates = sorted(set(blocked_dates) | {
+            date.today() + timedelta(days=n) for n in range(366)
+            if (date.today() + timedelta(days=n)).isoformat() not in nightly_prices
+        })
     if blocked_dates:
         start = prev = blocked_dates[0]
         for d in blocked_dates[1:]:
@@ -775,6 +805,7 @@ def room_detail(room_id):
 
     return render_template("room_detail.html", room=room,
                            booked_ranges=booked, photos=photos,
+                           nightly_prices=nightly_prices,
                            related_rooms=related)
 
 
@@ -981,6 +1012,9 @@ def logout():
 @app.route("/book/<int:room_id>", methods=["GET", "POST"])
 def booking(room_id):
     room = Room.query.get_or_404(room_id)
+    if not room.is_active or (room.beds24_property_id == 341384 and room.price <= 0):
+        flash("Online rates are not available yet. Please contact us for this apartment.", "info")
+        return redirect(url_for("room_detail", room_id=room.id))
     if not current_user.is_authenticated:
         session["next_url"] = url_for("booking", room_id=room_id)
         flash("Please sign in to book.", "info")
@@ -1256,6 +1290,40 @@ def admin_beds24_price_debug():
 
 _beds24_sync_state = {"running": False, "status": "never_run", "log": [], "started_at": None, "finished_at": None}
 _beds24_sync_lock = None
+_beds24_scheduler_started = False
+_beds24_scheduler_lock = threading.Lock()
+
+
+@app.before_request
+def ensure_beds24_scheduler():
+    """Catch up on wake-up and sync every 30 minutes while the service runs.
+
+    Render Free may suspend the process; the first request after wake-up
+    restarts this loop. API calls never block the visitor's request.
+    """
+    global _beds24_scheduler_started
+    if app.testing or not os.environ.get("BEDS24_REFRESH_TOKEN"):
+        return
+    with _beds24_scheduler_lock:
+        if _beds24_scheduler_started:
+            return
+        import threading
+
+        def run():
+            while True:
+                lock = _get_sync_lock()
+                if lock.acquire(blocking=False):
+                    try:
+                        _beds24_sync_state.update(running=True, status="running",
+                            started_at=datetime.utcnow().isoformat(), finished_at=None)
+                        _run_beds24_sync_background()
+                    finally:
+                        lock.release()
+                # Retry failed calls after ten minutes without hitting rate limits.
+                threading.Event().wait(600 if _beds24_sync_state["status"] == "error" else 1800)
+
+        threading.Thread(target=run, daemon=True, name="beds24-auto-sync").start()
+        _beds24_scheduler_started = True
 
 
 def _get_sync_lock():
@@ -2329,4 +2397,3 @@ def debug_cloudinary():
         "CLOUDINARY_API_SECRET": bool(CLOUDINARY_API_SECRET),
         "CLOUDINARY_ENABLED": CLOUDINARY_ENABLED,
     }
-

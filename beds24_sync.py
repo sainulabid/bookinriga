@@ -1,5 +1,5 @@
 """
-RigaNest x Beds24 — periodic sync.
+BookinRiga x Beds24 — periodic catalog and calendar sync.
 
 Pulls price + availability for every mapped room from Beds24 and writes
 it into the RoomAvailability table (and updates Room.price to the
@@ -221,7 +221,7 @@ def get_access_token():
     )
     data = resp.json()
     if resp.status_code != 200 or "token" not in data:
-        raise RuntimeError(f"Could not get access token: {data}")
+        raise RuntimeError(f"Could not get Beds24 access token (HTTP {resp.status_code})")
     return data["token"]
 
 
@@ -248,8 +248,7 @@ def fetch_calendar(access_token, room_id, start_date, end_date):
     )
     data = resp.json()
     if resp.status_code != 200 or not data.get("data"):
-        print(f"  [warn] calendar fetch failed for room {room_id}: {data}")
-        return []
+        raise RuntimeError(f"Calendar fetch failed for room {room_id} (HTTP {resp.status_code})")
 
     calendar = data["data"][0].get("calendar", [])
     if calendar:
@@ -268,7 +267,11 @@ def _extract_price(rng):
     instead of only ever looking for 'price1'."""
     for key in ("price1", "rate1", "price", "roomRate", "rate"):
         if rng.get(key) is not None:
-            return rng.get(key)
+            try:
+                price = float(rng[key])
+                return price if price > 0 else None
+            except (TypeError, ValueError):
+                return None
     return None
 
 
@@ -294,7 +297,7 @@ def expand_calendar(calendar_ranges, start_date, end_date):
         except (KeyError, ValueError):
             continue
         num_avail = rng.get("numAvail")
-        available = True if num_avail is None else (num_avail > 0)
+        available = num_avail is not None and int(num_avail) > 0 and price is not None
         d = max(rfrom, start_date)
         last = min(rto, end_date)
         while d <= last:
@@ -311,8 +314,7 @@ def sync_room(access_token, room):
     daily = expand_calendar(calendar, start_date, end_date)
 
     if not daily:
-        print(f"  [skip] no data returned for room {room.id} ({room.name})")
-        return 0
+        raise RuntimeError(f"No calendar data returned for room {room.beds24_room_id}")
 
     if not any(price is not None for price, _avail in daily.values()):
         print(f"  [warn] room {room.id} ({room.name}): availability synced but NO prices found. "
@@ -347,8 +349,7 @@ def sync_room(access_token, room):
         written += 1
         d += timedelta(days=1)
 
-    if lowest_price is not None:
-        room.price = lowest_price
+    room.price = lowest_price or 0
 
     db.session.commit()
     return written
@@ -361,8 +362,9 @@ def main():
 
     with app.app_context():
         access_token = get_access_token()
-
-        rooms = Room.query.filter(Room.beds24_room_id.isnot(None)).all()
+        from beds24_catalog import PROPERTY_ID, sync_catalog
+        sync_catalog(access_token)
+        rooms = Room.query.filter_by(beds24_property_id=PROPERTY_ID, is_active=True).all()
         if not rooms:
             print("No rooms have a beds24_room_id set yet. Run set_beds24_mapping.py first.")
             return
@@ -385,4 +387,3 @@ if __name__ == "__main__":
         main_amenities()
     else:
         main()
-
