@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% block title %}BookinRiga — Comfortable Stays in Riga{% endblock %}
+{% block title %}BookinRiga — Apartments in Riga Old Town & City Centre{% endblock %}
 
 {% block head %}
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css">
@@ -9,6 +9,29 @@
 .flatpickr-day.inRange { background:rgba(90,110,232,.12); border-color:transparent; }
 .flatpickr-calendar.rangeMode .flatpickr-days { width: auto; }
 .flatpickr-calendar.multiMonth .flatpickr-days { border-left: 1px solid #eee; }
+
+/* Intro + Welcome to Riga */
+.intro-grid { display:grid; grid-template-columns: 1.35fr 1fr; gap:56px; align-items:center; }
+.intro-text p { color:var(--gray-500); font-size:16px; line-height:1.8; margin-bottom:16px; }
+.intro-text .section-title { margin-bottom:20px; }
+.intro-points { display:grid; gap:14px; }
+.intro-point { display:flex; gap:14px; align-items:flex-start; padding:18px 20px; border-radius:16px; background:var(--off-white); }
+.intro-point-ico { flex:0 0 42px; height:42px; border-radius:12px; display:grid; place-items:center; background:var(--primary); color:#fff; font-size:19px; }
+.intro-point strong { display:block; font-size:15px; color:var(--gray-900); }
+.intro-point span { font-size:13.5px; color:var(--gray-500); }
+.riga-grid { display:grid; grid-template-columns: 1.1fr 1fr; gap:56px; align-items:center; }
+.riga-mosaic { display:grid; grid-template-columns:1fr 1fr; grid-auto-rows:210px; gap:12px; }
+.riga-mosaic figure { margin:0; position:relative; overflow:hidden; border-radius:16px; background:#e8eefc; }
+.riga-mosaic img { width:100%; height:100%; object-fit:cover; display:block; transition:transform .6s ease; }
+.riga-mosaic figure:hover img { transform:scale(1.05); }
+.riga-mosaic figcaption { position:absolute; left:10px; bottom:10px; padding:4px 10px; border-radius:20px; background:rgba(8,20,60,.6); color:#fff; font-size:12px; font-weight:600; backdrop-filter:blur(4px); }
+.riga-text p { color:var(--gray-500); font-size:16px; line-height:1.8; margin-bottom:16px; }
+.room-footer { flex-wrap:wrap; gap:6px; }
+.help-actions { display:flex; gap:14px; justify-content:center; flex-wrap:wrap; }
+@media (max-width: 900px) {
+  .intro-grid, .riga-grid { grid-template-columns:1fr; gap:32px; }
+  .riga-mosaic { grid-auto-rows:150px; }
+}
 </style>
 {% endblock %}
 
@@ -28,8 +51,8 @@
     </div>
 
     <div class="search-box-wrap">
-      <h1>{% if lang=='lv' %}Rezervējiet savu uzturēšanos{% else %}Book Your Stay{% endif %}</h1>
-      <p class="hero-sub">{% if lang=='lv' %}Mājīgi apartamenti Rīgas sirdī{% else %}Comfortable apartments in the heart of Riga{% endif %}</p>
+      <h1>BookinRiga</h1>
+      <p class="hero-sub">{% if lang=='lv' %}Vieta jūsu ideālajiem dzīves notikumiem un brīvdienām ♥️{% else %}Place for your perfect life events and holidays ♥️{% endif %}</p>
 
       <form class="search-box-dates" method="get" action="{{ url_for('rooms') }}" id="heroSearchForm">
         <div class="search-field">
@@ -69,13 +92,38 @@
     {% endif %}
   </section>
 
+  <!-- Intro -->
+  <section>
+    <div class="container intro-grid">
+      <div class="intro-text">
+        <p class="section-label">{% if lang=='lv' %}Laipni lūdzam{% else %}Welcome{% endif %}</p>
+        <h2 class="section-title">www.BookinRiga.com</h2>
+        {% if lang=='lv' %}
+        <p>Īsa vai ilga uzturēšanās, darba brauciens, ģimenes atvaļinājums vai nedēļas nogale — mēs par visu parūpēsimies. Piedāvājam arī korporatīvo izmitināšanu no vienas nakts līdz vairākiem mēnešiem.</p>
+        <p>Mūsu apartamenti ir pārdomāti iekārtoti un pilnībā aprīkoti, atrodas Vecrīgā un pilsētas centrā — netālu no veikaliem, muzejiem un restorāniem. Izvēlieties no mājīgas studijas līdz plašam četru guļamistabu apartamentam.</p>
+        <p>Mūsu saimnieki ir ar jums pirms uzturēšanās, tās laikā un pēc tās. Jautājumi, īpaši vēlējumi vai datumi izskatās aizņemti? Sazinieties ar mums — atbildam ātri.</p>
+        {% else %}
+        <p>Short stay or long stay, business trip, family holiday or weekend getaway — we've got you covered. We also offer corporate housing for anything from one night to several months.</p>
+        <p>Our apartments are thoughtfully designed and fully equipped, right in Riga Old Town and the city centre — close to shops, museums and restaurants. Choose anything from a cosy studio to a spacious four-bedroom apartment.</p>
+        <p>Our hosts are with you before, during and after your stay. Questions, special requests, or dates that look unavailable? Get in touch — we reply quickly.</p>
+        {% endif %}
+      </div>
+      <div class="intro-points">
+        <div class="intro-point"><div class="intro-point-ico">📍</div><div><strong>{% if lang=='lv' %}Vecrīga un centrs{% else %}Old Town &amp; City Centre{% endif %}</strong><span>{% if lang=='lv' %}Ejot kājām līdz galvenajām apskates vietām{% else %}Walk to the main sights, shops and restaurants{% endif %}</span></div></div>
+        <div class="intro-point"><div class="intro-point-ico">🛏️</div><div><strong>{% if lang=='lv' %}No studijām līdz 4 guļamistabām{% else %}Studios to 4 bedrooms{% endif %}</strong><span>{% if lang=='lv' %}Pilnībā aprīkoti apartamenti pāriem, ģimenēm un grupām{% else %}Fully equipped for couples, families and groups{% endif %}</span></div></div>
+        <div class="intro-point"><div class="intro-point-ico">📅</div><div><strong>{% if lang=='lv' %}No 1 nakts līdz vairākiem mēnešiem{% else %}1 night to several months{% endif %}</strong><span>{% if lang=='lv' %}Brīvdienas, darba braucieni un korporatīvā izmitināšana{% else %}Holidays, business trips and corporate housing{% endif %}</span></div></div>
+        <div class="intro-point"><div class="intro-point-ico">💬</div><div><strong>{% if lang=='lv' %}Saimnieki vienmēr palīdzēs{% else %}Hosts who help{% endif %}</strong><span>{% if lang=='lv' %}Pirms, laikā un pēc jūsu uzturēšanās{% else %}Before, during and after your stay{% endif %}</span></div></div>
+      </div>
+    </div>
+  </section>
+
   <!-- Featured Rooms -->
   <section>
     <div class="container">
       <div class="section-head">
         <p class="section-label">{% if lang=='lv' %}Speciāli izvēlēts jums{% else %}Handpicked For You{% endif %}</p>
         <h2 class="section-title">{% if lang=='lv' %}Piedāvātie apartamenti{% else %}Featured Apartments{% endif %}</h2>
-        <p class="section-sub">{% if lang=='lv' %}Mūsu mīļākās telpas, izvēlētas pēc komforta, stila un neaizmirstama skata.{% else %}Our most loved spaces, chosen for comfort, style and that unforgettable view.{% endif %}</p>
+        <p class="section-sub">{% if lang=='lv' %}Atklājiet mūsu rūpīgi atlasītos apartamentus — katrs ar unikālu pieredzi un izcilu komfortu.{% else %}Discover our handpicked selection of stunning vacation rentals, each offering unique experiences and exceptional comfort.{% endif %}</p>
       </div>
 
       <div class="rooms-grid">
@@ -112,12 +160,36 @@
     </div>
   </section>
 
+  <!-- Welcome to Riga -->
+  <section style="padding-top:0">
+    <div class="container riga-grid">
+      <div class="riga-mosaic">
+        {% for src, cap in welcome_photos %}
+        <figure><img src="{{ src }}" alt="{{ cap }}" loading="lazy"><figcaption>{{ cap }}</figcaption></figure>
+        {% endfor %}
+      </div>
+      <div class="riga-text">
+        <p class="section-label">{% if lang=='lv' %}Atklājiet pilsētu{% else %}Discover the city{% endif %}</p>
+        <h2 class="section-title">{% if lang=='lv' %}Laipni lūdzam Rīgā{% else %}Welcome to Riga{% endif %}</h2>
+        {% if lang=='lv' %}
+        <p>Rīga — Latvijas galvaspilsēta un lielākā pilsēta Baltijā — jau vairāk nekā 800 gadus ir tirdzniecības osta, kur viduslaiku vēsture sadzīvo ar mūsdienu Eiropas dzīvi.</p>
+        <p>Pastaigājieties pa UNESCO sarakstā iekļauto Vecrīgu, apbrīnojiet jūgendstila arhitektūru, izgaršojiet vietējos produktus Centrāltirgū bijušajos cepelīnu angāros, atpūtieties kanāla parkos un iepazīstiet kafejnīcas, amatniecības alus bārus un ziemeļnieciskus restorānus.</p>
+        <p>Kompakta, pieejama un viegli sasniedzama — pludmales, meži un Jūrmala ir tikai īsa brauciena ar vilcienu attālumā. Rīgā ir ko darīt jebkurā gadalaikā.</p>
+        {% else %}
+        <p>Riga, Latvia's capital and the largest city in the Baltics, has been a trading port for more than 800 years — medieval history and modern European life side by side.</p>
+        <p>Wander the UNESCO-listed Old Town, admire the Art Nouveau quarter, taste local produce at the Central Market in former Zeppelin hangars, relax in the canal parks, and explore a lively scene of cafés, craft beer bars and Nordic-style restaurants.</p>
+        <p>Compact, affordable and easy to reach — with beaches, forests and the resort town of Jūrmala a short train ride away, Riga has something for every season.</p>
+        {% endif %}
+      </div>
+    </div>
+  </section>
+
   <!-- Photo gallery: attractions, with names + links to detail pages -->
   <section style="padding-top:0">
     <div class="container">
       <div class="section-head">
-        <p class="section-label">{% if lang=='lv' %}Ieskatieties{% else %}Take A Look{% endif %}</p>
-        <h2 class="section-title">{% if lang=='lv' %}BookinRiga iekšpusē{% else %}Inside BookinRiga{% endif %}</h2>
+        <p class="section-label">{% if lang=='lv' %}Apskates vietas{% else %}Attractions{% endif %}</p>
+        <h2 class="section-title">{% if lang=='lv' %}Apskates vietas netālu no BookinRiga{% else %}Discover attractions near BookinRiga{% endif %}</h2>
       </div>
       {% if gallery %}
       <div class="home-gallery">
@@ -137,17 +209,16 @@
     </div>
   </section>
 
-  <!-- CTA -->
+  <!-- Help / contact -->
   <section style="background:var(--off-white)">
     <div class="container" style="text-align:center">
-      <p class="section-label">{% if lang=='lv' %}Biedru priekšrocības{% else %}Member Benefits{% endif %}</p>
-      <h2 class="section-title">{% if lang=='lv' %}Pievienojieties BookinRiga, ietaupiet katrā uzturēšanās reizē{% else %}Join BookinRiga, save on every stay{% endif %}</h2>
-      <p class="section-sub" style="margin:0 auto 28px">{% if lang=='lv' %}Izveidojiet bezmaksas kontu biedru cenām, ātrākai norēķināšanās un drošai e-pasta verificētai pieteikšanās.{% else %}Create a free account for member rates, faster checkout and secure email-verified login.{% endif %}</p>
-      {% if not current_user.is_authenticated %}
-      <a href="{{ url_for('register') }}" class="btn-primary">{% if lang=='lv' %}Izveidot bezmaksas kontu{% else %}Create Free Account{% endif %}</a>
-      {% else %}
-      <a href="{{ url_for('rooms') }}" class="btn-primary">{% if lang=='lv' %}Pārlūkot istabas{% else %}Browse Apartments{% endif %}</a>
-      {% endif %}
+      <p class="section-label">{% if lang=='lv' %}Esam šeit, lai palīdzētu{% else %}We're here to help{% endif %}</p>
+      <h2 class="section-title">{% if lang=='lv' %}Jautājumi vai īpaši vēlējumi?{% else %}Questions or special requests?{% endif %}</h2>
+      <p class="section-sub" style="margin:0 auto 28px">{% if lang=='lv' %}Vēlamie datumi izskatās aizņemti vai vajag ko īpašu? Zvaniet vai rakstiet mums — atbildēsim ātri.{% else %}Your dates look blocked or you need something special? Call us or send a message — we'll get back to you quickly.{% endif %}</p>
+      <div class="help-actions">
+        <a href="{{ url_for('contact') }}" class="btn-primary">{% if lang=='lv' %}Sazināties{% else %}Contact Us{% endif %}</a>
+        <a href="tel:+37129355537" class="btn-secondary">📞 +371 293 555 37</a>
+      </div>
     </div>
   </section>
 </div>

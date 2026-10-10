@@ -485,6 +485,99 @@ def legacy_tool(view):
     return wrapped
 
 
+# ----------------------------------------------------------------------
+# Riga photos & attractions published on the BookinRiga reference site
+# (bookinriga.sites.gas.travel). Used for the homepage slideshow, the
+# "Welcome to Riga" section and the attractions catalog.
+# ----------------------------------------------------------------------
+_R2 = "https://pub-543ea0ea60674fffbc40f7ca17a21278.r2.dev/website"
+RIGA_SLIDES = [
+    _R2 + "/attraction-image/257/large/be79137a-46b7-4a81-a9a4-92600fba5578-Vecriga.webp",
+    _R2 + "/attraction-image/257/large/67678c7a-bb0a-4b65-802a-479bd3e9166b-town-hall-riga.webp",
+    _R2 + "/attraction-image/257/large/90d2df08-0d10-45df-a11d-ae06a53ee05b-House-of-the-blackheads.webp",
+    _R2 + "/attraction-image/257/large/f6780a9e-82ca-4a89-b3e3-e82ebfa68166-three-brothers.webp",
+    _R2 + "/attraction-image/257/large/b0c57c0a-cd3a-4b4a-9840-eb61d4a56fae-Riga-cathedral-copy.webp",
+]
+WELCOME_RIGA_PHOTOS = [
+    (_R2 + "/about/203/large/c91c85cd-af88-4fcf-a4b4-e714940abeac-Vecriga.webp", "Vecrīga — Riga Old Town"),
+    (_R2 + "/about/203/large/45ed697d-b9b8-4edc-8e61-8e2408562604-three-brothers.webp", "Three Brothers"),
+    (_R2 + "/about/203/large/5fec5c07-def0-4d9e-a655-7f44f0a33be7-riga-central-market.webp", "Riga Central Market"),
+    (_R2 + "/about/203/large/fe98edcc-1b9e-4452-9f83-14d25f179f7a-Bastejkalna-Parks.webp", "Bastejkalna Park"),
+]
+REFERENCE_ATTRACTIONS = [
+    dict(name="Vecrīga", aliases=["Riga Old Town"], location="Vecrīga, Riga, Latvia",
+         image=_R2 + "/attraction-image/257/large/be79137a-46b7-4a81-a9a4-92600fba5578-Vecriga.webp",
+         summary="Riga's historic heart on the east bank of the Daugava: winding cobblestone lanes, "
+                 "medieval churches, Riga Castle and St. Peter's Church. In summer the squares fill "
+                 "with concerts, markets, cafés and bars."),
+    dict(name="Freedom Monument", aliases=[], location="Brīvības bulvāris, Riga, Latvia",
+         image=_R2 + "/attraction-image/257/large/59d98669-c233-499c-ba4a-f667c92fe177-freedom-monument.webp",
+         summary="Unveiled in 1935, the monument is Latvia's symbol of independence — a figure raising "
+                 "three stars for the country's historical regions. The surrounding canal park is a calm "
+                 "place for a walk, a few minutes from BookinRiga apartments."),
+    dict(name="House of the Blackheads", aliases=[], location="Town Hall Square, Riga, Latvia",
+         image=_R2 + "/attraction-image/257/large/90d2df08-0d10-45df-a11d-ae06a53ee05b-House-of-the-blackheads.webp",
+         summary="First built in the 14th century as the guild hall of unmarried German merchants, "
+                 "destroyed and rebuilt several times, and faithfully restored in the 1990s. Today it "
+                 "hosts exhibitions and cultural events."),
+    dict(name="Three Brothers", aliases=["St. Peter's Church"], location="Mazā Pils iela, Riga, Latvia",
+         image=_R2 + "/attraction-image/257/large/f6780a9e-82ca-4a89-b3e3-e82ebfa68166-three-brothers.webp",
+         summary="Three neighbouring houses that are among the oldest dwellings in Riga, each from a "
+                 "different era — from Gothic to Baroque. Restored to their original look, they now "
+                 "house the Museum of Architecture."),
+    dict(name="Town Hall Square", aliases=["Latvian National Opera"], location="Rātslaukums, Riga, Latvia",
+         image=_R2 + "/attraction-image/257/large/67678c7a-bb0a-4b65-802a-479bd3e9166b-town-hall-riga.webp",
+         summary="One of the most picturesque squares in the Old Town, framed by historic facades and "
+                 "cobbled lanes. Its Town Hall, rebuilt in 2003 after wartime destruction, is the seat "
+                 "of the city council."),
+    dict(name="Riga Central Market", aliases=[], location="Nēģu iela 7, Riga, Latvia",
+         image=_R2 + "/attraction-image/257/large/6d3affdd-6671-457e-a189-86990d742113-riga-central-market.webp",
+         summary="Latvia's largest market and one of the biggest in Europe, set in five former Zeppelin "
+                 "hangars. Fresh produce, fish, meat, dairy and handicrafts — and a UNESCO-listed sight "
+                 "in its own right."),
+    dict(name="Bastejkalna Park", aliases=["Bastejkalns Park", "Bastejkalna Parks"], location="Riga, Latvia",
+         image=_R2 + "/attraction-image/257/large/35681998-c9c2-409b-b73e-3fb07793289f-Bastejkalna-Parks.webp",
+         summary="A green canal-side park in the city centre with walking paths, benches and monuments, "
+                 "including one to the poet Rainis — an easy escape from the city bustle."),
+    dict(name="Riga Cathedral", aliases=[], location="Doma laukums, Riga, Latvia",
+         image=_R2 + "/attraction-image/257/large/b0c57c0a-cd3a-4b4a-9840-eb61d4a56fae-Riga-cathedral-copy.webp",
+         summary="The Cathedral of Saint Mary dates from the 13th century and is one of Riga's best-known "
+                 "landmarks, with a Gothic and Baroque interior, stained glass and a famous organ."),
+]
+
+
+def sync_reference_attractions():
+    """Give seed attractions the real photos and text from the reference site.
+
+    Only attractions still using the original placeholder images
+    (static/gallery/g*.jpg) are touched, so anything an admin has edited or
+    added keeps its own content. Missing reference attractions are added once.
+    """
+    by_name = {}
+    for ref in REFERENCE_ATTRACTIONS:
+        for n in [ref["name"]] + ref["aliases"]:
+            by_name[n.lower()] = ref
+    present = {a.name.lower() for a in Attraction.query.all()}
+    changed = False
+    for a in Attraction.query.all():
+        if not (a.image or "").startswith("gallery/g"):
+            continue
+        ref = by_name.get(a.name.lower())
+        if not ref or (ref["name"].lower() in present and ref["name"].lower() != a.name.lower()):
+            continue
+        a.name, a.summary, a.image, a.location = ref["name"], ref["summary"], ref["image"], ref["location"]
+        present.add(ref["name"].lower())
+        changed = True
+    for ref in REFERENCE_ATTRACTIONS:
+        if ref["name"].lower() not in present and not any(x.lower() in present for x in ref["aliases"]):
+            db.session.add(Attraction(name=ref["name"], summary=ref["summary"],
+                                      image=ref["image"], location=ref["location"]))
+            present.add(ref["name"].lower())
+            changed = True
+    if changed:
+        db.session.commit()
+
+
 def parse_date(v):
     try:
         return datetime.strptime(v, "%Y-%m-%d").date()
@@ -712,11 +805,13 @@ def index():
     selected = sorted([r for r in candidates if r.homepage_order and r.homepage_order > 0],
                       key=lambda r: (r.homepage_order, r.id))
     rooms = (selected or [r for r in candidates if _room_has_upcoming_availability(r)] or candidates)[:8]
-    slides = [r.image_url() for r in rooms if r.image_url()][:4]
+    banners = [url_for("static", filename="slides/" + f) for f in get_banner_images()]
+    slides = banners or RIGA_SLIDES
     gallery = Attraction.query.filter_by(is_active=True).order_by(Attraction.created_at.desc()).limit(8).all()
     today_str = date.today().isoformat()
     tomorrow_str = (date.today() + timedelta(days=1)).isoformat()
     return render_template("index.html", rooms=rooms, slides=slides, gallery=gallery,
+                           welcome_photos=WELCOME_RIGA_PHOTOS,
                            today=today_str, tomorrow=tomorrow_str)
 
 
@@ -2272,8 +2367,8 @@ def admin_about():
 @app.route("/admin/settings", methods=["GET", "POST"])
 @admin_required
 def admin_settings():
-    logo_path = os.path.join(BASE_DIR, "static", "logo.png")
-    logo_exists = os.path.exists(logo_path)
+    logo_exists = any(os.path.exists(os.path.join(BASE_DIR, "static", "logo" + e))
+                      for e in (".svg", ".png", ".jpg", ".jpeg", ".webp"))
 
     if request.method == "POST":
         action = request.form.get("action")
@@ -2359,7 +2454,7 @@ def inject_globals():
                for ext in (".png", ".jpg", ".jpeg", ".svg", ".webp"))
     lang = session.get("lang", "en")
     logo_file = None
-    for ext in (".png", ".jpg", ".jpeg", ".svg", ".webp"):
+    for ext in (".svg", ".png", ".webp", ".jpg", ".jpeg"):
         if os.path.exists(os.path.join(BASE_DIR, "static", "logo" + ext)):
             logo_file = "logo" + ext
             break
@@ -2499,43 +2594,20 @@ def seed():
                       r6.id: ["g7.jpg", "g5.jpg", "g8.jpg"]}
         for rid, files in photo_sets.items():
             for fn in files:
-                src = "slides/" + fn if fn.startswith("slide") else "gallery/" + fn
+                if fn.startswith("slide"):
+                    continue
+                src = "gallery/" + fn
                 db.session.add(RoomImage(room_id=rid, filename=src))
     if Attraction.query.count() == 0:
-        attraction_data = [
-            dict(name="Freedom Monument", image="gallery/g1.jpg", location="Riga, Latvia",
-                 summary="A landmark in central Riga that honours Latvia's independence, unveiled in 1935. "
-                         "The column is topped by a figure holding three stars, each representing one of "
-                         "the country's historical regions. Visitors can also explore the surrounding park, "
-                         "home to several other monuments."),
-            dict(name="Riga Old Town", image="gallery/g2.jpg", location="Vecriga, Riga, Latvia",
-                 summary="A UNESCO World Heritage medieval quarter packed with cobblestone streets, "
-                         "Art Nouveau facades and centuries-old churches. It's the heart of Riga's "
-                         "history and a favourite spot for an evening stroll."),
-            dict(name="House of the Blackheads", image="gallery/g3.jpg", location="Riga, Latvia",
-                 summary="A striking Gothic building dating back to the 14th century, rebuilt after "
-                         "wartime damage. It once served as a guild hall for unmarried merchants and "
-                         "now hosts exhibitions and civic events."),
-            dict(name="St. Peter's Church", image="gallery/g4.jpg", location="Riga, Latvia",
-                 summary="One of Riga's oldest churches, known for its tall spire and an observation "
-                         "deck with panoramic views over the rooftops of the Old Town."),
-            dict(name="Riga Central Market", image="gallery/g5.jpg", location="Riga, Latvia",
-                 summary="A lively covered market set in five enormous zeppelin-hangar pavilions, "
-                         "offering fresh produce, local food and souvenirs."),
-            dict(name="Latvian National Opera", image="gallery/g6.jpg", location="Riga, Latvia",
-                 summary="A neoclassical theatre on the edge of Bastejkalns Park, home to opera and "
-                         "ballet performances year-round."),
-            dict(name="Bastejkalns Park", image="gallery/g7.jpg", location="Riga, Latvia",
-                 summary="A scenic canal-side park bordering the Old Town, popular for boat rides, "
-                         "picnics and quiet walks beneath the trees."),
-            dict(name="Riga Cathedral", image="gallery/g8.jpg", location="Riga, Latvia",
-                 summary="A grand Lutheran cathedral overlooking Dome Square, with one of the largest "
-                         "pipe organs in the world."),
-        ]
-        for d in attraction_data:
-            img = d.pop("image")
-            db.session.add(Attraction(image=img, **d))
+        for ref in REFERENCE_ATTRACTIONS:
+            db.session.add(Attraction(name=ref["name"], summary=ref["summary"],
+                                      image=ref["image"], location=ref["location"]))
     db.session.commit()
+    try:
+        sync_reference_attractions()
+    except Exception as e:
+        db.session.rollback()
+        print(f"[seed] attraction photo update skipped: {e}")
 
 
 @app.route("/admin/debug-cloudinary")

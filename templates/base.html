@@ -6,8 +6,11 @@
 <title>{% block title %}BookinRiga — Apartment Booking{% endblock %}</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}?v=4">
-<link rel="icon" type="image/png" href="{{ url_for('static', filename='logo.png') }}">
+<link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}?v=5">
+<link rel="icon" type="image/svg+xml" href="{{ url_for('static', filename='brand/favicon.svg') }}">
+<link rel="icon" type="image/png" sizes="32x32" href="{{ url_for('static', filename='brand/favicon-32.png') }}">
+<link rel="apple-touch-icon" href="{{ url_for('static', filename='brand/apple-touch-icon.png') }}">
+<meta property="og:image" content="{{ url_for('static', filename='brand/logo-color.png', _external=True) }}">
 {% block head %}{% endblock %}
 </head>
 <body>
@@ -114,7 +117,7 @@
             Bookin<span>Riga</span>
           {% endif %}
         </div>
-        <p class="footer-desc">Comfortable, well-located apartments across Riga. Book in minutes, settle in fast.</p>
+        <p class="footer-desc">{% if lang=='lv' %}Labi aprīkoti apartamenti Vecrīgā un Rīgas centrā — īsām un ilgām uzturēšanās reizēm.{% else %}Well-equipped apartments in Riga Old Town and the city centre — for short stays, long stays and everything in between.{% endif %}</p>
         <div style="margin-top:20px;display:flex;flex-direction:column;gap:10px">
           <a href="tel:+37129355537" style="color:rgba(255,255,255,0.65);font-size:13px;display:flex;align-items:center;gap:8px">
             <span style="color:var(--gold)">📞</span> +371 293 555 37
