@@ -353,12 +353,45 @@ def apply_catalog(props, calendars, start, end, probe_photos=True):
     return result
 
 
+LAST_REPORT = {}
+
+
+def property_report(props, previously_published):
+    """Which Beds24 properties the token sees, and whether their rooms were on
+    the website before (via gas.travel). Helps choose BEDS24_PROPERTY_IDS."""
+    rows = []
+    for p in props:
+        rooms = p.get("roomTypes", [])
+        was = [r["id"] for r in rooms if r["id"] in previously_published]
+        rows.append({"property_id": p["id"], "name": str(p.get("name") or "")[:80],
+                     "rooms": len(rooms), "rooms_on_website_before": len(was),
+                     "room_names": [str(r.get("name"))[:60] for r in rooms]})
+    rows.sort(key=lambda r: (-r["rooms_on_website_before"], r["property_id"]))
+    before = [r["property_id"] for r in rows if r["rooms_on_website_before"]]
+    return {
+        "properties_seen": len(rows),
+        "rooms_seen": sum(r["rooms"] for r in rows),
+        "properties_with_rooms_on_website_before": len(before),
+        "rooms_from_website_before_found_in_beds24": sum(r["rooms_on_website_before"] for r in rows),
+        "rooms_on_website_before_total": len(previously_published),
+        "suggested_BEDS24_PROPERTY_IDS": ",".join(str(i) for i in before),
+        "properties": rows,
+    }
+
+
 def main():
-    from app import app
+    global LAST_REPORT
+    from app import app, Room
     props, calendars, start, end = fetch_catalog()
     with app.app_context():
+        before = {r.beds24_room_id for r in Room.query.filter(Room.reference_unit_id.isnot(None),
+                                                              Room.beds24_room_id.isnot(None)).all()}
+        LAST_REPORT = property_report(props, before)
         result = apply_catalog(props, calendars, start, end)
     print(f"[beds24] Direct catalog sync: {result}")
+    print(f"[beds24] Properties seen: {LAST_REPORT['properties_seen']}, rooms: {LAST_REPORT['rooms_seen']}, "
+          f"previously published rooms found: {LAST_REPORT['rooms_from_website_before_found_in_beds24']}"
+          f"/{LAST_REPORT['rooms_on_website_before_total']}")
     return result
 
 

@@ -1754,6 +1754,12 @@ def admin_beds24_sync_status():
     state["photos_still_on_gas_travel"] = gas_left
     state["safe_to_remove_gas_travel_site"] = state["rooms_from_beds24"] > 0 and gas_left == 0 \
         and state.get("status") == "success" and state["catalog_source"] == "beds24"
+    state["selected_property_ids"] = os.environ.get("BEDS24_PROPERTY_IDS", "") or "all properties the token can read"
+    try:
+        import beds24_direct
+        state["beds24_properties"] = beds24_direct.LAST_REPORT or "run /admin/run-beds24-sync first"
+    except Exception:
+        pass
     return state
 
 

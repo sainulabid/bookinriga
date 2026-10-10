@@ -137,6 +137,13 @@ class DirectSyncTests(unittest.TestCase):
             with self.assertRaises(bd.Beds24Error):
                 bd.fetch_properties('t')
 
+    def test_property_report_suggests_previously_published(self):
+        rep = bd.property_report(props(), {149472})
+        self.assertEqual(rep['properties_seen'], 2)
+        self.assertEqual(rep['rooms_seen'], 3)
+        self.assertEqual(rep['suggested_BEDS24_PROPERTY_IDS'], '341384')
+        self.assertEqual(rep['properties'][0]['property_id'], 341384)
+
     def test_expand_calendar_price_fallback(self):
         days = bd.expand_calendar([{'from': self.start.isoformat(), 'to': self.start.isoformat(),
                                     'numAvail': 2, 'price1': 0, 'price2': '48.5'}], self.start, self.end)
