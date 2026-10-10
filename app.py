@@ -92,6 +92,8 @@ if CLOUDINARY_ENABLED:
     )
 
 app.config["SECRET_KEY"] = os.environ.get("SECRET_KEY", "change-this-secret-key")
+if app.config["SECRET_KEY"] == "change-this-secret-key" and os.environ.get("DATABASE_URL"):
+    print("[security] WARNING: SECRET_KEY is not set — set a long random SECRET_KEY in Render environment.")
 DATABASE_URL = os.environ.get("DATABASE_URL", "sqlite:///" + os.path.join(BASE_DIR, "riganest.db"))
 # Render.com gives postgres:// but SQLAlchemy needs postgresql://
 if DATABASE_URL.startswith("postgres://"):
@@ -467,6 +469,18 @@ def admin_required(view):
     def wrapped(*a, **k):
         if not current_user.is_admin:
             abort(403)
+        return view(*a, **k)
+    return wrapped
+
+def legacy_tool(view):
+    """One-time Homestate migration/repair routes. They would overwrite the
+    reference catalog (see BEDS24_SYNC.md), so they are off unless
+    ENABLE_LEGACY_ADMIN_TOOLS=1 is set in the environment."""
+    @wraps(view)
+    def wrapped(*a, **k):
+        if os.environ.get("ENABLE_LEGACY_ADMIN_TOOLS") != "1":
+            return ("This one-time legacy tool is disabled because it would overwrite the "
+                    "reference catalog. Set ENABLE_LEGACY_ADMIN_TOOLS=1 only if you really need it.", 410)
         return view(*a, **k)
     return wrapped
 
@@ -1548,6 +1562,7 @@ def admin_beds24_sync_status():
 
 @app.route("/admin/fix-beds24-room-id-mismatches")
 @admin_required
+@legacy_tool
 def admin_fix_beds24_room_id_mismatches():
     """
     ONE-TIME FIX. Comparing our DB's beds24_room_id values against
@@ -1581,6 +1596,7 @@ def admin_fix_beds24_room_id_mismatches():
 
 @app.route("/admin/migrate-to-homestate-rooms")
 @admin_required
+@legacy_tool
 def admin_migrate_to_homestate_rooms():
     """
     ONE-TIME MIGRATION. Switches the room catalog over from the
@@ -1704,6 +1720,7 @@ def admin_migrate_to_homestate_rooms():
 
 @app.route("/admin/cleanup-homestate-duplicates")
 @admin_required
+@legacy_tool
 def admin_cleanup_homestate_duplicates():
     """
     ONE-TIME CLEANUP, follow-up to /admin/migrate-to-homestate-rooms.
@@ -1789,6 +1806,7 @@ def admin_cleanup_homestate_duplicates():
 
 @app.route("/admin/fix-homestate-images")
 @admin_required
+@legacy_tool
 def admin_fix_homestate_images():
     """
     ONE-TIME FIX, follow-up to /admin/migrate-to-homestate-rooms.
@@ -2415,8 +2433,12 @@ def seed():
     if not User.query.filter_by(email="admin@riganest.com").first():
         a = User(name="BookinRiga Admin", email="admin@riganest.com",  # login email kept as-is — it's the existing live admin credential
                  phone="+10000000000", is_admin=True)
-        a.set_password("admin123")
+        # Fresh database only — the live admin already exists and is untouched.
+        pw = os.environ.get("ADMIN_PASSWORD") or secrets.token_urlsafe(12)
+        a.set_password(pw)
         db.session.add(a)
+        if not os.environ.get("ADMIN_PASSWORD"):
+            print(f"[seed] Created admin@riganest.com with a one-time password: {pw}  (change it after login, or set ADMIN_PASSWORD)")
     if Room.query.count() == 0:
         r1 = Room(name="Vecrīga Loft", room_type="Suite", price=245, capacity=3,
                   beds=1, size_sqm=48, rating=4.9,
@@ -2516,6 +2538,17 @@ def seed():
     db.session.commit()
 
 
+@app.route("/admin/debug-cloudinary")
+@admin_required
+def debug_cloudinary():
+    return {
+        "CLOUDINARY_CLOUD_NAME": bool(CLOUDINARY_CLOUD_NAME),
+        "CLOUDINARY_API_KEY": bool(CLOUDINARY_API_KEY),
+        "CLOUDINARY_API_SECRET": bool(CLOUDINARY_API_SECRET),
+        "CLOUDINARY_ENABLED": CLOUDINARY_ENABLED,
+    }
+
+
 with app.app_context():
     seed()
 
@@ -2524,14 +2557,6 @@ if __name__ == "__main__":
     print("=" * 60)
     print(f"  Payments: {'STRIPE (live keys set)' if PAYMENTS_LIVE else 'DEV MODE (demo, no real charge)'}")
     print(f"  Email OTP : {'GMAIL (live)' if EMAIL_LIVE else 'DEV MODE (code shown on screen + terminal)'}")
-    print("  Admin   : admin@riganest.com / admin123")
+    print("  Admin   : admin@riganest.com (password printed by [seed] on first run, or ADMIN_PASSWORD)")
     print("=" * 60)
     app.run(debug=True)
-@app.route("/debug-cloudinary")
-def debug_cloudinary():
-    return {
-        "CLOUDINARY_CLOUD_NAME": bool(CLOUDINARY_CLOUD_NAME),
-        "CLOUDINARY_API_KEY": bool(CLOUDINARY_API_KEY),
-        "CLOUDINARY_API_SECRET": bool(CLOUDINARY_API_SECRET),
-        "CLOUDINARY_ENABLED": CLOUDINARY_ENABLED,
-    }
