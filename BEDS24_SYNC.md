@@ -1,29 +1,39 @@
-# BookinRiga reference sync
+# BookinRiga ↔ Beds24 sync
 
-The required source is https://bookinriga.sites.gas.travel/book-now/.
-Its current published catalog has 50 GAS unit IDs sourced through Beds24
-Marketplace. This is different from the 35-room Beds24 property 341384.
+## Catalog: Beds24 → website (default)
 
-`reference_sync.py` reads the unit selection from the published page and uses
-its public GAS unit and availability endpoints. It copies names, full text,
-photos, amenities, capacities, source order, homepage selections, and 365 days
-of nightly prices/availability. GAS unit IDs are stored separately from Beds24
-room IDs. It needs no Beds24 refresh token and follows the same public data
-source as the reference website; timing depends on the upstream GAS sync.
+`beds24_direct.py` reads the catalog straight from the Beds24 account behind
+`BEDS24_REFRESH_TOKEN` (API v2). Every 30 minutes it mirrors, for each room:
+name, description, photos, amenities (feature codes), capacity, stay limits,
+size, address, and 365 days of nightly prices and availability. Whatever you
+change in Beds24 appears on bookinriga.onrender.com at the next sync.
 
-The catalog updates only after every selected room and its calendar validate.
-Any incomplete/API error leaves the previous catalog intact. Removed/unrelated
-rooms become inactive; local IDs and bookings are retained. Missing calendar
-prices or unknown dates cannot be booked. The catalog sync does not copy guest bookings
-from Beds24. New local booking export is described below.
+- Publishes every property the token can read. To limit it, set
+  `BEDS24_PROPERTY_IDS=123,456` in Render.
+- Rooms are matched by Beds24 room ID, so existing apartments, their
+  bookings and homepage order are kept.
+- Photos: room pictures from the API; for single-apartment properties the
+  property pictures (Beds24 media.xmlcal.com). If Beds24 returns none, the
+  room keeps its current photos.
+- The catalog changes only after every property and calendar validated; any
+  API error keeps the previous catalog. Removed rooms are hidden, not deleted.
+- Unknown dates or dates without a price can never be booked.
+- An apartment unticked "Visible to guests" in admin stays hidden after syncs.
+- Room specs edited in admin (specs override) are not overwritten.
+- Required token scopes for the catalog: `read:properties`, `read:inventory`.
 
-The app starts background refresh on its first request, repeats every 30
-minutes, and retries failures after 10 minutes. Render Free sleeps when idle;
-updates resume when it wakes. Logs expose the sync outcome and room count.
+Run a sync now: `/admin/run-beds24-sync`; check it: `/admin/beds24-sync-status`.
 
-Existing direct Beds24 utilities remain available, but automatic and normal
-admin sync use the reference source. Do not run legacy mapping/repair scripts
-against the reference catalog.
+### Retiring bookinriga.sites.gas.travel
+
+Some Riga and attraction photos were hosted on the gas.travel CDN. The app
+copies them into its own database (`CachedImage`, served from `/media/<id>`)
+in the background. Before deleting the gas.travel site, open
+`/admin/beds24-sync-status` and confirm `"safe_to_remove_gas_travel_site": true`
+(Beds24 sync succeeded and no photo still points at gas.travel).
+
+The old reference sync (`reference_sync.py`) remains available with
+`CATALOG_SOURCE=reference`, but it stops working once the site is removed.
 
 ## Website bookings → Beds24
 
@@ -76,6 +86,6 @@ stays blocked until the update succeeds. Cancellation does not automatically
 refund Stripe payments. Requests for bookings created through the external Beds24
 booking engine must be handled through their original booking channel.
 
-Run `python -m unittest test_beds24_catalog test_reference_sync test_beds24_booking`.
+Run `python -m unittest test_beds24_direct test_beds24_catalog test_reference_sync test_beds24_booking`.
 Tests use an isolated SQLite database and mocked APIs: no real charge, guest
 email or inventory-blocking test reservation is made.

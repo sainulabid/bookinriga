@@ -3,9 +3,9 @@
 Apartment booking website for short-term rentals in Riga, Latvia — live at
 <https://bookinriga.onrender.com>.
 
-Flask app with an English/Latvian site, apartment catalog synced from the
-published BookinRiga reference site, Stripe checkout, email OTP / Google
-sign-in, and verified export of paid bookings to Beds24.
+Flask app with an English/Latvian site, apartment catalog synced directly
+from Beds24 (rooms, texts, photos, prices, availability), Stripe checkout,
+email OTP / Google sign-in, and verified export of paid bookings to Beds24.
 
 ## Run locally
 
@@ -30,7 +30,9 @@ from `ADMIN_PASSWORD`, or a random one-time password printed in the logs.
 | `DATABASE_URL` | Render PostgreSQL URL |
 | `STRIPE_SECRET_KEY`, `STRIPE_PUBLISHABLE_KEY` | Card payments (`sk_live_` for real bookings) |
 | `STRIPE_WEBHOOK_SECRET` | Signing secret for `/webhooks/stripe` |
-| `BEDS24_REFRESH_TOKEN` | Beds24 API v2 — booking export |
+| `BEDS24_REFRESH_TOKEN` | Beds24 API v2 — catalog sync and booking export |
+| `BEDS24_PROPERTY_IDS` | Optional: only publish these Beds24 property IDs (comma-separated) |
+| `CATALOG_SOURCE` | `beds24` (default) or `reference` (old gas.travel sync) |
 | `GMAIL_ADDRESS`, `GMAIL_APP_PASSWORD` | Email OTP via Gmail SMTP |
 | `RESEND_API_KEY`, `RESEND_FROM_EMAIL` | Email notifications via Resend (optional) |
 | `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET` | "Continue with Google" |
@@ -43,15 +45,15 @@ Never commit `.env` — set secrets in Render → Environment.
 
 ## Catalog & Beds24
 
-See [BEDS24_SYNC.md](BEDS24_SYNC.md) for the reference catalog sync, booking
+See [BEDS24_SYNC.md](BEDS24_SYNC.md) for the Beds24 catalog sync, booking
 export, reconciliation and Render configuration.
 
-Admin pages: `/admin`, `/admin/bookings`, `/admin/booking-export/status`.
+Admin pages: `/admin`, `/admin/bookings`, `/admin/booking-export/status`, `/admin/beds24-sync-status`.
 
 ## Tests
 
 ```bash
-python -m unittest test_beds24_catalog test_reference_sync test_beds24_booking
+python -m unittest test_beds24_direct test_beds24_catalog test_reference_sync test_beds24_booking
 ```
 
 Tests use an isolated SQLite database and mocked APIs.

@@ -30,7 +30,7 @@ from functools import wraps
 
 from flask import (
     Flask, render_template, request, redirect, url_for,
-    flash, abort, session
+    flash, abort, session, make_response
 )
 from flask_sqlalchemy import SQLAlchemy
 from flask_login import (
@@ -257,23 +257,30 @@ class Room(db.Model):
     specs_manual_override = db.Column(db.Boolean, default=False)
     homepage_order = db.Column(db.Integer, default=0)
     is_active = db.Column(db.Boolean, default=True)
+    # Set when an admin hides an apartment; the Beds24 sync keeps it hidden.
+    website_hidden = db.Column(db.Boolean, default=False)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     bookings = db.relationship("Booking", backref="room", cascade="all, delete-orphan")
+
+    @property
+    def is_synced(self):
+        """Rooms whose rates/availability come from the source catalog."""
+        return self.reference_unit_id is not None or self.beds24_property_id is not None
     photos = db.relationship("RoomImage", backref="room", cascade="all, delete-orphan")
 
     def image_url(self):
         if not self.image:
             return None
         if self.image.startswith("http"):
-            return self.image
+            return cached_url(self.image)
         return url_for("static", filename="uploads/" + self.image)
 
     def amenity_list(self):
-        if self.reference_unit_id is not None:
+        if self.is_synced and self.features:
             groups = self.features_dict()
             return list(dict.fromkeys(a for values in groups.values()
                                      if isinstance(values, list) for a in values if isinstance(a, str) and a))
-        if (self.reference_unit_id is not None or self.beds24_property_id == 341384):
+        if self.is_synced:
             return [a.strip() for a in (self.amenities or "").split(",") if a.strip()]
         return [a.strip() for a in self.amenities.split(",")
                 if a.strip() and a.strip().lower() not in {"ac", "air conditioning", "air-conditioning", "breakfast", "breakfast available", "breakfast kit"}]
@@ -299,7 +306,7 @@ class Room(db.Model):
         urls = []
         for p in self.photos:
             if p.filename.startswith("http"):
-                urls.append(p.filename)
+                urls.append(cached_url(p.filename))
             else:
                 urls.append(url_for("static", filename=p.filename))
         if not urls:
@@ -376,7 +383,7 @@ class Attraction(db.Model):
         if not self.image:
             return None
         if self.image.startswith("http"):
-            return self.image
+            return cached_url(self.image)
         if "/" in self.image:
             return url_for("static", filename=self.image)
         return url_for("static", filename="uploads/" + self.image)
@@ -386,7 +393,7 @@ class Attraction(db.Model):
         urls = []
         for p in self.photos:
             if p.filename.startswith("http"):
-                urls.append(p.filename)
+                urls.append(cached_url(p.filename))
             else:
                 urls.append(url_for("static", filename=p.filename))
         cover = self.image_url()
@@ -399,6 +406,40 @@ class AttractionImage(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     attraction_id = db.Column(db.Integer, db.ForeignKey("attraction.id"), nullable=False)
     filename = db.Column(db.String(255), nullable=False)
+
+
+class CachedImage(db.Model):
+    """Self-hosted copy of a photo that lived on the old gas.travel site,
+    so the website keeps working after that site is removed."""
+    id = db.Column(db.Integer, primary_key=True)
+    url = db.Column(db.String(500), unique=True, nullable=False)
+    content_type = db.Column(db.String(60), default="image/webp")
+    data = db.Column(db.LargeBinary, nullable=False)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+
+
+GAS_IMAGE_HOST = "pub-543ea0ea60674fffbc40f7ca17a21278.r2.dev"
+_cached_ids = None
+
+
+def _cached_map():
+    global _cached_ids
+    if _cached_ids is None:
+        try:
+            _cached_ids = {u: i for i, u in db.session.query(CachedImage.id, CachedImage.url).all()}
+        except Exception:
+            db.session.rollback()
+            return {}
+    return _cached_ids
+
+
+def cached_url(url):
+    """Serve gas.travel-hosted photos from our own database copy when we have one."""
+    if url and GAS_IMAGE_HOST in url:
+        image_id = _cached_map().get(url)
+        if image_id:
+            return f"/media/{image_id}"
+    return url
 
 
 class ContactMessage(db.Model):
@@ -424,7 +465,7 @@ class SiteAbout(db.Model):
         if not self.image:
             return None
         if self.image.startswith("http"):
-            return self.image
+            return cached_url(self.image)
         return url_for("static", filename="uploads/" + self.image)
 
 
@@ -440,7 +481,7 @@ class SitePage(db.Model):
         if not self.image:
             return None
         if self.image.startswith("http"):
-            return self.image
+            return cached_url(self.image)
         return url_for("static", filename="uploads/" + self.image)
 
 @login_manager.user_loader
@@ -578,6 +619,46 @@ def sync_reference_attractions():
         db.session.commit()
 
 
+def cache_gas_images():
+    """Copy every photo still hosted on the gas.travel CDN into CachedImage.
+
+    Runs in the background; each image is fetched only once. Returns
+    (cached_now, total_known, failed)."""
+    global _cached_ids
+    urls = set(RIGA_SLIDES) | {u for u, _ in WELCOME_RIGA_PHOTOS} | {a["image"] for a in REFERENCE_ATTRACTIONS}
+    for model, col in ((Room, Room.image), (RoomImage, RoomImage.filename),
+                       (Attraction, Attraction.image), (AttractionImage, AttractionImage.filename)):
+        urls |= {v for (v,) in db.session.query(col).filter(col.like(f"%{GAS_IMAGE_HOST}%")).all()}
+    have = {u for (u,) in db.session.query(CachedImage.url).all()}
+    done = failed = 0
+    for url in sorted(u for u in urls if u and GAS_IMAGE_HOST in u and u not in have):
+        try:
+            r = requests.get(url, timeout=30)
+            ctype = r.headers.get("content-type", "").split(";")[0].strip()
+            if r.status_code != 200 or not ctype.startswith("image/") or len(r.content) > 12_000_000:
+                failed += 1
+                continue
+            db.session.add(CachedImage(url=url[:500], content_type=ctype[:60], data=r.content))
+            db.session.commit()
+            done += 1
+        except Exception:
+            db.session.rollback()
+            failed += 1
+    _cached_ids = None
+    return done, len(urls), failed
+
+
+@app.route("/media/<int:image_id>")
+def cached_image(image_id):
+    img = db.session.get(CachedImage, image_id)
+    if not img:
+        abort(404)
+    resp = make_response(img.data)
+    resp.headers["Content-Type"] = img.content_type or "image/webp"
+    resp.headers["Cache-Control"] = "public, max-age=31536000, immutable"
+    return resp
+
+
 def parse_date(v):
     try:
         return datetime.strptime(v, "%Y-%m-%d").date()
@@ -589,7 +670,7 @@ def is_available(room_id, ci, co, exclude=None):
     room = db.session.get(Room, room_id)
     if not room or not room.is_active:
         return False
-    if (room.reference_unit_id is not None or room.beds24_property_id == 341384):
+    if room.is_synced:
         # Unknown dates and missing rates must not look bookable.
         nights = (co - ci).days
         if nights < room.min_stay or nights > room.max_stay:
@@ -806,12 +887,12 @@ def index():
                       key=lambda r: (r.homepage_order, r.id))
     rooms = (selected or [r for r in candidates if _room_has_upcoming_availability(r)] or candidates)[:8]
     banners = [url_for("static", filename="slides/" + f) for f in get_banner_images()]
-    slides = banners or RIGA_SLIDES
+    slides = banners or [cached_url(u) for u in RIGA_SLIDES]
     gallery = Attraction.query.filter_by(is_active=True).order_by(Attraction.created_at.desc()).limit(8).all()
     today_str = date.today().isoformat()
     tomorrow_str = (date.today() + timedelta(days=1)).isoformat()
     return render_template("index.html", rooms=rooms, slides=slides, gallery=gallery,
-                           welcome_photos=WELCOME_RIGA_PHOTOS,
+                           welcome_photos=[(cached_url(u), c) for u, c in WELCOME_RIGA_PHOTOS],
                            today=today_str, tomorrow=tomorrow_str)
 
 
@@ -865,7 +946,7 @@ def rooms():
     else:
         # No dates picked yet — still don't feature listings with no
         # real upcoming availability ahead of ones that do.
-        if not any(r.reference_unit_id for r in listings):
+        if not any(r.is_synced for r in listings):
             listings.sort(key=lambda r: (not _room_has_upcoming_availability(r), r.price))
 
     return render_template("rooms.html", rooms=listings, q=q,
@@ -897,7 +978,7 @@ def room_detail(room_id):
     ).all()
     nightly_prices = {r.date.isoformat(): r.price for r in nightly_rows
                       if r.available and r.price and r.price > 0}
-    if (room.reference_unit_id is not None or room.beds24_property_id == 341384):
+    if room.is_synced:
         # Unsynced/no-rate dates are unknown, never display them as free.
         blocked_dates = sorted(set(blocked_dates) | {
             date.today() + timedelta(days=n) for n in range(366)
@@ -1137,7 +1218,7 @@ def logout():
 @app.route("/book/<int:room_id>", methods=["GET", "POST"])
 def booking(room_id):
     room = Room.query.get_or_404(room_id)
-    if not room.is_active or ((room.reference_unit_id is not None or room.beds24_property_id == 341384) and room.price <= 0):
+    if not room.is_active or (room.is_synced and room.price <= 0):
         flash("Online rates are not available yet. Please contact us for this apartment.", "info")
         return redirect(url_for("room_detail", room_id=room.id))
     if not current_user.is_authenticated:
@@ -1541,6 +1622,13 @@ def ensure_beds24_scheduler():
 
         def run():
             while True:
+                try:
+                    with app.app_context():
+                        done, total, failed = cache_gas_images()
+                        if done or failed:
+                            app.logger.warning("[images] self-hosted %s new photos (%s known, %s failed)", done, total, failed)
+                except Exception as e:
+                    app.logger.warning("[images] photo copy skipped: %s", e)
                 lock = _get_sync_lock()
                 if lock.acquire(blocking=False):
                     try:
@@ -1580,7 +1668,10 @@ def _get_sync_lock():
 def _run_beds24_sync_background():
     import io
     import contextlib
-    from reference_sync import main as sync_main
+    if os.environ.get("CATALOG_SOURCE", "beds24").strip().lower() == "reference":
+        from reference_sync import main as sync_main
+    else:
+        from beds24_direct import main as sync_main
 
     buf = io.StringIO()
     try:
@@ -1596,7 +1687,7 @@ def _run_beds24_sync_background():
         _beds24_sync_state["running"] = False
         app.logger.warning("Beds24 sync finished: %s", _beds24_sync_state["status"])
         for line in _beds24_sync_state["log"]:
-            if line.startswith("[reference]") or line.startswith("[catalog]") or line.startswith("ERROR: Could not get Beds24") or line.startswith("ERROR: Beds24") or line.startswith("ERROR: Calendar fetch failed") or line.startswith("ERROR: No calendar data"):
+            if line.startswith("[beds24]") or line.startswith("[reference]") or line.startswith("[catalog]") or line.startswith("ERROR: Could not get Beds24") or line.startswith("ERROR: Beds24") or line.startswith("ERROR: Calendar fetch failed") or line.startswith("ERROR: No calendar data"):
                 app.logger.warning("Beds24 sync: %s", line)
 
 
@@ -1652,7 +1743,18 @@ def admin_run_beds24_sync():
 @admin_required
 def admin_beds24_sync_status():
     """Check on the background sync started by /admin/run-beds24-sync."""
-    return dict(_beds24_sync_state)
+    state = dict(_beds24_sync_state)
+    state["catalog_source"] = os.environ.get("CATALOG_SOURCE", "beds24").strip().lower() or "beds24"
+    state["active_rooms"] = Room.query.filter_by(is_active=True).count()
+    state["rooms_from_beds24"] = Room.query.filter(Room.beds24_property_id.isnot(None)).count()
+    gas_left = sum(1 for u in [r.image for r in Room.query.filter_by(is_active=True).all()]
+                   + [a.image for a in Attraction.query.all()]
+                   if u and GAS_IMAGE_HOST in u and u not in _cached_map())
+    state["photos_self_hosted"] = CachedImage.query.count()
+    state["photos_still_on_gas_travel"] = gas_left
+    state["safe_to_remove_gas_travel_site"] = state["rooms_from_beds24"] > 0 and gas_left == 0 \
+        and state.get("status") == "success" and state["catalog_source"] == "beds24"
+    return state
 
 
 @app.route("/admin/fix-beds24-room-id-mismatches")
@@ -2111,6 +2213,7 @@ def admin_edit_room(room_id):
         r.location = request.form.get("location", "").strip()
         r.homepage_order = max(0, request.form.get("homepage_order", 0, type=int) or 0)
         r.is_active = bool(request.form.get("is_active"))
+        r.website_hidden = not r.is_active
         _apply_room_specs_from_form(r, request.form)
         save_room_features(r, request.form)
         upload_image(r, folder="riganest/rooms")
