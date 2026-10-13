@@ -113,8 +113,9 @@ def _update(room_ids):
 
 def handle_webhook():
     secret = os.environ.get("BEDS24_WEBHOOK_SECRET", "")
-    given = request.args.get("key", "") or request.headers.get("X-Webhook-Secret", "")
-    if not secret or not hmac.compare_digest(given, secret):
+    # Accept the key in the URL (?key=) or in the X-Webhook-Secret header.
+    given = [request.args.get("key", ""), request.headers.get("X-Webhook-Secret", "")]
+    if not secret or not any(g and hmac.compare_digest(g, secret) for g in given):
         return jsonify({"ok": False, "error": "unauthorized"}), 401
     if request.method == "GET":
         return jsonify({"ok": True, "note": "webhook is reachable"}), 200
