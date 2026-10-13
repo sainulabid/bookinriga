@@ -879,20 +879,68 @@ def _room_has_upcoming_availability(room, days=90):
 # ----------------------------------------------------------------------
 # Public pages
 # ----------------------------------------------------------------------
+# High-resolution, landscape Riga photos for the homepage slideshow
+# (Pexels licence: free for commercial use, no attribution required).
+# Served at the width the visitor's screen needs via srcset; if Pexels is
+# unreachable the slide falls back to the matching reference-site photo.
+def _pexels(pid, w):
+    return f"https://images.pexels.com/photos/{pid}/pexels-photo-{pid}.jpeg?auto=compress&cs=tinysrgb&w={w}"
+
+
+HOME_SLIDES = [
+    # (pexels id, CSS object-position, fallback reference photo)
+    (681405,   "center 60%", RIGA_SLIDES[0]),   # Old Town rooftops at sunrise
+    (33830451, "center 55%", RIGA_SLIDES[4]),   # Aerial: historic centre & Daugava
+    (19856364, "center 50%", RIGA_SLIDES[1]),   # Riga skyline at sunset
+    (20714231, "center 55%", RIGA_SLIDES[2]),   # Old Town in winter
+]
+
+
+def _home_slides():
+    """Admin-uploaded banners win; otherwise the curated high-res set."""
+    banners = [url_for("static", filename="slides/" + f) for f in get_banner_images()]
+    if banners:
+        return [dict(src=u, srcset="", pos="center", fallback="") for u in banners]
+    return [dict(src=_pexels(pid, 1920),
+                 srcset=", ".join(f"{_pexels(pid, w)} {w}w" for w in (960, 1280, 1920, 2560)),
+                 pos=pos, fallback=cached_url(fb))
+            for pid, pos, fb in HOME_SLIDES]
+
+
+def _homepage_rooms(limit=12):
+    """Bookable apartments for the homepage carousel: admin-pinned ones
+    first (homepage_order), then the newest — only rooms with at least one
+    free date in the next 90 days."""
+    today = date.today()
+    cutoff = today + timedelta(days=90)
+    synced_ids = {rid for (rid,) in db.session.query(RoomAvailability.room_id).filter(
+        RoomAvailability.date >= today, RoomAvailability.date <= cutoff).distinct()}
+    free_ids = {rid for (rid,) in db.session.query(RoomAvailability.room_id).filter(
+        RoomAvailability.date >= today, RoomAvailability.date <= cutoff,
+        RoomAvailability.available.is_(True)).distinct()}
+
+    def available(r):
+        if r.is_synced and (r.price or 0) <= 0:
+            return False          # can't be booked online
+        return r.id in free_ids or r.id not in synced_ids
+
+    rooms = [r for r in Room.query.filter_by(is_active=True).all() if available(r)]
+    rooms.sort(key=lambda r: (
+        0 if (r.homepage_order or 0) > 0 else 1,
+        r.homepage_order or 0,
+        -(r.created_at.timestamp() if r.created_at else 0),
+        -r.id,
+    ))
+    return rooms[:limit]
+
+
 @app.route("/")
 def index():
-    candidates = Room.query.filter_by(is_active=True).all()
-    candidates.sort(key=lambda r: (not _room_has_upcoming_availability(r), -r.rating))
-    selected = sorted([r for r in candidates if r.homepage_order and r.homepage_order > 0],
-                      key=lambda r: (r.homepage_order, r.id))
-    rooms = (selected or [r for r in candidates if _room_has_upcoming_availability(r)] or candidates)[:8]
-    banners = [url_for("static", filename="slides/" + f) for f in get_banner_images()]
-    slides = banners or [cached_url(u) for u in RIGA_SLIDES]
+    rooms = _homepage_rooms()
     gallery = Attraction.query.filter_by(is_active=True).order_by(Attraction.created_at.desc()).limit(8).all()
     today_str = date.today().isoformat()
     tomorrow_str = (date.today() + timedelta(days=1)).isoformat()
-    return render_template("index.html", rooms=rooms, slides=slides, gallery=gallery,
-                           welcome_photos=[(cached_url(u), c) for u, c in WELCOME_RIGA_PHOTOS],
+    return render_template("index.html", rooms=rooms, slides=_home_slides(), gallery=gallery,
                            today=today_str, tomorrow=tomorrow_str)
 
 

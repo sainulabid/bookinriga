@@ -10,7 +10,7 @@
 .flatpickr-calendar.rangeMode .flatpickr-days { width: auto; }
 .flatpickr-calendar.multiMonth .flatpickr-days { border-left: 1px solid #eee; }
 
-/* Intro + Welcome to Riga */
+/* Intro */
 .intro-grid { display:grid; grid-template-columns: 1.35fr 1fr; gap:56px; align-items:center; }
 .intro-text p { color:var(--gray-500); font-size:16px; line-height:1.8; margin-bottom:16px; }
 .intro-text .section-title { margin-bottom:20px; }
@@ -19,18 +19,56 @@
 .intro-point-ico { flex:0 0 42px; height:42px; border-radius:12px; display:grid; place-items:center; background:var(--primary); color:#fff; font-size:19px; }
 .intro-point strong { display:block; font-size:15px; color:var(--gray-900); }
 .intro-point span { font-size:13.5px; color:var(--gray-500); }
-.riga-grid { display:grid; grid-template-columns: 1.1fr 1fr; gap:56px; align-items:center; }
-.riga-mosaic { display:grid; grid-template-columns:1fr 1fr; grid-auto-rows:210px; gap:12px; }
-.riga-mosaic figure { margin:0; position:relative; overflow:hidden; border-radius:16px; background:#e8eefc; }
-.riga-mosaic img { width:100%; height:100%; object-fit:cover; display:block; transition:transform .6s ease; }
-.riga-mosaic figure:hover img { transform:scale(1.05); }
-.riga-mosaic figcaption { position:absolute; left:10px; bottom:10px; padding:4px 10px; border-radius:20px; background:rgba(8,20,60,.6); color:#fff; font-size:12px; font-weight:600; backdrop-filter:blur(4px); }
-.riga-text p { color:var(--gray-500); font-size:16px; line-height:1.8; margin-bottom:16px; }
 .room-footer { flex-wrap:wrap; gap:6px; }
 .help-actions { display:flex; gap:14px; justify-content:center; flex-wrap:wrap; }
 @media (max-width: 900px) {
-  .intro-grid, .riga-grid { grid-template-columns:1fr; gap:32px; }
-  .riga-mosaic { grid-auto-rows:150px; }
+  .intro-grid { grid-template-columns:1fr; gap:32px; }
+}
+
+/* Hero slideshow — real <img> with srcset so every screen gets a sharp photo */
+.hero-slide { background:#0b1430; }
+.hero-slide img { position:absolute; inset:0; width:100%; height:100%; object-fit:cover; display:block;
+  transform:scale(1.06); transition:transform 7s ease-out; }
+.hero-slide.active img { transform:scale(1); }
+.hero-slide::after { z-index:1; background:
+  linear-gradient(180deg, rgba(6,12,32,.35) 0%, rgba(6,12,32,.12) 35%, rgba(6,12,32,.18) 60%, rgba(6,12,32,.55) 100%),
+  radial-gradient(ellipse at center, rgba(6,12,32,.28) 0%, rgba(6,12,32,0) 70%); }
+
+/* Apartments carousel */
+.apt-section { padding-top:72px; }
+.apt-head { display:flex; align-items:flex-end; justify-content:space-between; gap:24px; margin-bottom:32px; }
+.apt-head .section-title { margin-bottom:6px; }
+.apt-head .section-sub { max-width:560px; }
+.apt-nav { display:flex; gap:10px; flex-shrink:0; }
+.apt-nav button { width:46px; height:46px; border-radius:50%; border:1.5px solid var(--gray-100); background:#fff;
+  color:var(--gray-900); display:grid; place-items:center; cursor:pointer; transition:all .2s; box-shadow:var(--shadow-sm); }
+.apt-nav button:hover:not(:disabled) { background:var(--primary); border-color:var(--primary); color:#fff; }
+.apt-nav button:disabled { opacity:.35; cursor:default; }
+.apt-nav svg { width:20px; height:20px; }
+.apt-viewport { position:relative; }
+.apt-track { display:flex; gap:24px; overflow-x:auto; scroll-snap-type:x mandatory; scroll-behavior:smooth;
+  padding:6px 4px 26px; margin:0 -4px; scrollbar-width:none; -webkit-overflow-scrolling:touch; }
+.apt-track::-webkit-scrollbar { display:none; }
+.apt-track .room-card { flex:0 0 calc((100% - 72px) / 4); scroll-snap-align:start; display:flex; flex-direction:column; }
+.apt-track .room-body { flex:1; display:flex; flex-direction:column; }
+.apt-track .room-footer { margin-top:auto; }
+.apt-track .room-img { height:220px; }
+.apt-track .room-img img { transition:transform .6s ease; }
+.apt-track .room-card:hover .room-img img { transform:scale(1.06); }
+.room-avail { position:absolute; top:14px; right:14px; background:rgba(255,255,255,.95); color:#0f8a4a;
+  font-size:11.5px; font-weight:700; padding:4px 10px; border-radius:20px; display:flex; align-items:center; gap:5px; }
+.room-avail::before { content:''; width:7px; height:7px; border-radius:50%; background:#16a34a; }
+.apt-progress { height:4px; border-radius:4px; background:var(--gray-100); overflow:hidden; max-width:260px; margin:0 auto; }
+.apt-progress span { display:block; height:100%; width:0; background:var(--primary); border-radius:4px; transition:width .35s ease; }
+@media (max-width: 1100px) { .apt-track .room-card { flex-basis:calc((100% - 48px) / 3); } }
+@media (max-width: 820px)  { .apt-track .room-card { flex-basis:calc((100% - 24px) / 2); } }
+@media (max-width: 560px)  {
+  .apt-track { gap:16px; }
+  .apt-track .room-card { flex-basis:84%; }
+  .apt-head { align-items:center; }
+  .apt-head .section-sub { display:none; }
+  .apt-nav button { width:40px; height:40px; }
+  .apt-section { padding-top:56px; }
 }
 </style>
 {% endblock %}
@@ -43,7 +81,12 @@
     <div class="hero-slider" id="heroSlider">
       {% if slides %}
         {% for s in slides %}
-        <div class="hero-slide{% if loop.first %} active{% endif %}" style="background-image:url('{{ s }}')"></div>
+        <div class="hero-slide{% if loop.first %} active{% endif %}">
+          <img src="{{ s.src }}"{% if s.srcset %} srcset="{{ s.srcset }}" sizes="100vw"{% endif %}
+               alt="Riga" style="object-position:{{ s.pos }}"
+               {% if loop.first %}fetchpriority="high"{% else %}loading="lazy"{% endif %} decoding="async"
+               {% if s.fallback %}onerror="this.onerror=null;this.removeAttribute('srcset');this.src='{{ s.fallback }}'"{% endif %}>
+        </div>
         {% endfor %}
       {% else %}
         <div class="hero-slide active"></div>
@@ -92,6 +135,65 @@
     {% endif %}
   </section>
 
+  <!-- Apartments carousel (latest & available) -->
+  <section class="apt-section">
+    <div class="container">
+      <div class="apt-head">
+        <div>
+          <p class="section-label">{% if lang=='lv' %}Pieejams tagad{% else %}Available now{% endif %}</p>
+          <h2 class="section-title">{% if lang=='lv' %}Mūsu apartamenti{% else %}Our Apartments{% endif %}</h2>
+          <p class="section-sub">{% if lang=='lv' %}Jaunākie apartamenti ar brīviem datumiem Vecrīgā un pilsētas centrā.{% else %}Our latest apartments with open dates in Riga Old Town and the city centre.{% endif %}</p>
+        </div>
+        {% if rooms|length > 1 %}
+        <div class="apt-nav">
+          <button type="button" id="aptPrev" aria-label="Previous"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="m15 18-6-6 6-6"/></svg></button>
+          <button type="button" id="aptNext" aria-label="Next"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="m9 18 6-6-6-6"/></svg></button>
+        </div>
+        {% endif %}
+      </div>
+
+      {% if rooms %}
+      <div class="apt-viewport">
+        <div class="apt-track" id="aptTrack">
+          {% for room in rooms %}
+          <a class="room-card" href="{{ url_for('room_detail', room_id=room.id) }}">
+            <div class="room-img">
+              {% set cover = room.image_url() or (room.photo_urls()[0] if room.photo_urls() else None) %}
+              {% if cover %}<img src="{{ cover }}" alt="{{ room.name }}" loading="lazy" decoding="async">
+              {% else %}<span class="room-img-placeholder">🛏️</span>{% endif %}
+              {% if room.room_type %}<div class="room-img-badge"><span class="badge badge-gold">{{ room.room_type }}</span></div>{% endif %}
+              <span class="room-avail">{% if lang=='lv' %}Pieejams{% else %}Available{% endif %}</span>
+            </div>
+            <div class="room-body">
+              <div class="room-name">{{ room.name }}</div>
+              <div class="room-meta">
+                <span>👤 {{ room.capacity }} guests</span>
+                <span>🛏️ {{ room.beds }} bed{{ 's' if room.beds > 1 }}</span>
+                {% if room.size_sqm %}<span>📐 {{ room.size_sqm }}m²</span>{% endif %}
+              </div>
+              <div class="room-amenities">
+                {% for a in room.amenity_list()[:3] %}<span class="amenity-tag">{{ a }}</span>{% endfor %}
+              </div>
+              <div class="room-footer">
+                <div class="room-price">{% if room.price > 0 %}€{{ '%.0f'|format(room.price) }}<span>/night</span>{% else %}{% if lang=='lv' %}Jautājiet cenu{% else %}Contact for rates{% endif %}{% endif %}</div>
+                <div class="room-stars">★ {{ '%.1f'|format(room.rating) }}</div>
+              </div>
+            </div>
+          </a>
+          {% endfor %}
+        </div>
+      </div>
+      {% if rooms|length > 1 %}<div class="apt-progress"><span id="aptProgress"></span></div>{% endif %}
+      {% else %}
+      <div class="empty-state"><h3>{% if lang=='lv' %}Šobrīd nav brīvu apartamentu{% else %}No apartments available right now{% endif %}</h3></div>
+      {% endif %}
+
+      <div style="text-align:center;margin-top:36px">
+        <a href="{{ url_for('rooms') }}" class="btn-secondary">{% if lang=='lv' %}Skatīt visus apartamentus →{% else %}All Apartments →{% endif %}</a>
+      </div>
+    </div>
+  </section>
+
   <!-- Intro -->
   <section>
     <div class="container intro-grid">
@@ -113,73 +215,6 @@
         <div class="intro-point"><div class="intro-point-ico">🛏️</div><div><strong>{% if lang=='lv' %}No studijām līdz 4 guļamistabām{% else %}Studios to 4 bedrooms{% endif %}</strong><span>{% if lang=='lv' %}Pilnībā aprīkoti apartamenti pāriem, ģimenēm un grupām{% else %}Fully equipped for couples, families and groups{% endif %}</span></div></div>
         <div class="intro-point"><div class="intro-point-ico">📅</div><div><strong>{% if lang=='lv' %}No 1 nakts līdz vairākiem mēnešiem{% else %}1 night to several months{% endif %}</strong><span>{% if lang=='lv' %}Brīvdienas, darba braucieni un korporatīvā izmitināšana{% else %}Holidays, business trips and corporate housing{% endif %}</span></div></div>
         <div class="intro-point"><div class="intro-point-ico">💬</div><div><strong>{% if lang=='lv' %}Saimnieki vienmēr palīdzēs{% else %}Hosts who help{% endif %}</strong><span>{% if lang=='lv' %}Pirms, laikā un pēc jūsu uzturēšanās{% else %}Before, during and after your stay{% endif %}</span></div></div>
-      </div>
-    </div>
-  </section>
-
-  <!-- Featured Rooms -->
-  <section>
-    <div class="container">
-      <div class="section-head">
-        <p class="section-label">{% if lang=='lv' %}Speciāli izvēlēts jums{% else %}Handpicked For You{% endif %}</p>
-        <h2 class="section-title">{% if lang=='lv' %}Piedāvātie apartamenti{% else %}Featured Apartments{% endif %}</h2>
-        <p class="section-sub">{% if lang=='lv' %}Atklājiet mūsu rūpīgi atlasītos apartamentus — katrs ar unikālu pieredzi un izcilu komfortu.{% else %}Discover our handpicked selection of stunning vacation rentals, each offering unique experiences and exceptional comfort.{% endif %}</p>
-      </div>
-
-      <div class="rooms-grid">
-        {% for room in rooms %}
-        <a class="room-card" href="{{ url_for('room_detail', room_id=room.id) }}">
-          <div class="room-img">
-            {% set cover = room.image_url() or (room.photo_urls()[0] if room.photo_urls() else None) %}
-            {% if cover %}<img src="{{ cover }}" alt="{{ room.name }}">
-            {% else %}<span class="room-img-placeholder">🛏️</span>{% endif %}
-            <div class="room-img-badge"><span class="badge badge-gold">{{ room.room_type }}</span></div>
-          </div>
-          <div class="room-body">
-            <div class="room-name">{{ room.name }}</div>
-            <div class="room-meta">
-              <span>👤 {{ room.capacity }} guests</span>
-              <span>🛏️ {{ room.beds }} bed{{ 's' if room.beds > 1 }}</span>
-              <span>📐 {{ room.size_sqm }}m²</span>
-            </div>
-            <div class="room-amenities">
-              {% for a in room.amenity_list()[:3] %}<span class="amenity-tag">{{ a }}</span>{% endfor %}
-            </div>
-            <div class="room-footer">
-              <div class="room-price">{% if room.price > 0 %}€{{ '%.0f'|format(room.price) }}{% else %}{% if lang=='lv' %}Jautājiet cenu{% else %}Contact for rates{% endif %}{% endif %}{% if room.price > 0 %}<span>/night</span>{% endif %}</div>
-              <div class="room-stars">★ {{ '%.1f'|format(room.rating) }}</div>
-            </div>
-          </div>
-        </a>
-        {% endfor %}
-      </div>
-
-      <div style="text-align:center;margin-top:44px">
-        <a href="{{ url_for('rooms') }}" class="btn-secondary">{% if lang=='lv' %}Skatīt visas istabas →{% else %}All Apartments →{% endif %}</a>
-      </div>
-    </div>
-  </section>
-
-  <!-- Welcome to Riga -->
-  <section style="padding-top:0">
-    <div class="container riga-grid">
-      <div class="riga-mosaic">
-        {% for src, cap in welcome_photos %}
-        <figure><img src="{{ src }}" alt="{{ cap }}" loading="lazy"><figcaption>{{ cap }}</figcaption></figure>
-        {% endfor %}
-      </div>
-      <div class="riga-text">
-        <p class="section-label">{% if lang=='lv' %}Atklājiet pilsētu{% else %}Discover the city{% endif %}</p>
-        <h2 class="section-title">{% if lang=='lv' %}Laipni lūdzam Rīgā{% else %}Welcome to Riga{% endif %}</h2>
-        {% if lang=='lv' %}
-        <p>Rīga — Latvijas galvaspilsēta un lielākā pilsēta Baltijā — jau vairāk nekā 800 gadus ir tirdzniecības osta, kur viduslaiku vēsture sadzīvo ar mūsdienu Eiropas dzīvi.</p>
-        <p>Pastaigājieties pa UNESCO sarakstā iekļauto Vecrīgu, apbrīnojiet jūgendstila arhitektūru, izgaršojiet vietējos produktus Centrāltirgū bijušajos cepelīnu angāros, atpūtieties kanāla parkos un iepazīstiet kafejnīcas, amatniecības alus bārus un ziemeļnieciskus restorānus.</p>
-        <p>Kompakta, pieejama un viegli sasniedzama — pludmales, meži un Jūrmala ir tikai īsa brauciena ar vilcienu attālumā. Rīgā ir ko darīt jebkurā gadalaikā.</p>
-        {% else %}
-        <p>Riga, Latvia's capital and the largest city in the Baltics, has been a trading port for more than 800 years — medieval history and modern European life side by side.</p>
-        <p>Wander the UNESCO-listed Old Town, admire the Art Nouveau quarter, taste local produce at the Central Market in former Zeppelin hangars, relax in the canal parks, and explore a lively scene of cafés, craft beer bars and Nordic-style restaurants.</p>
-        <p>Compact, affordable and easy to reach — with beaches, forests and the resort town of Jūrmala a short train ride away, Riga has something for every season.</p>
-        {% endif %}
       </div>
     </div>
   </section>
@@ -240,6 +275,42 @@
   }
   dots.forEach(d => d.addEventListener('click', () => go(parseInt(d.dataset.i))));
   if (slides.length > 1) setInterval(() => go(cur + 1), 5000);
+
+  // Apartments carousel: auto-advances, pauses on hover/touch, loops
+  (function(){
+    var track = document.getElementById('aptTrack');
+    if (!track) return;
+    var prev = document.getElementById('aptPrev'), next = document.getElementById('aptNext');
+    var bar = document.getElementById('aptProgress');
+    var paused = false, timer = null;
+    function step(){ var c = track.querySelector('.room-card'); if (!c) return 0;
+      return c.getBoundingClientRect().width + parseFloat(getComputedStyle(track).columnGap || 24); }
+    function maxScroll(){ return track.scrollWidth - track.clientWidth; }
+    function update(){
+      var m = maxScroll();
+      if (bar) bar.style.width = (m > 0 ? Math.max(12, (track.scrollLeft + track.clientWidth) / track.scrollWidth * 100) : 100) + '%';
+      if (prev) prev.disabled = m <= 0;
+      if (next) next.disabled = m <= 0;
+    }
+    function go(dir){
+      var m = maxScroll(); if (m <= 0) return;
+      if (dir > 0 && track.scrollLeft >= m - 4) track.scrollTo({left:0});
+      else if (dir < 0 && track.scrollLeft <= 4) track.scrollTo({left:m});
+      else track.scrollBy({left: dir * step()});
+    }
+    function start(){ stop(); timer = setInterval(function(){ if (!paused && !document.hidden) go(1); }, 3500); }
+    function stop(){ if (timer) clearInterval(timer); }
+    if (prev) prev.addEventListener('click', function(){ go(-1); start(); });
+    if (next) next.addEventListener('click', function(){ go(1); start(); });
+    track.addEventListener('mouseenter', function(){ paused = true; });
+    track.addEventListener('mouseleave', function(){ paused = false; });
+    track.addEventListener('touchstart', function(){ paused = true; }, {passive:true});
+    track.addEventListener('touchend', function(){ setTimeout(function(){ paused = false; }, 4000); }, {passive:true});
+    track.addEventListener('scroll', update, {passive:true});
+    window.addEventListener('resize', update);
+    update();
+    if (!window.matchMedia('(prefers-reduced-motion: reduce)').matches) start();
+  })();
 
   // Hero date-range picker (single calendar, two months side-by-side, like Booking.com)
   (function(){
