@@ -110,6 +110,12 @@ class DirectSyncTests(unittest.TestCase):
         self.apply()
         self.assertEqual(db.session.get(Room, old.id).image, '')
 
+    def test_bed_count_from_feature_codes(self):
+        from beds24_direct import bed_count
+        self.assertEqual(bed_count({'featureCodes': [['BEDROOM', 'BED_DOUBLE'], ['BEDROOM', 'BED_SINGLE', 'BED_SINGLE'], ['LIVING_ROOM', 'SOFA_BED'], ['WIFI']]}), 4)
+        self.assertEqual(bed_count({'featureCodes': [['WIFI', 'KITCHEN', 'BED_LINEN']]}), None)
+        self.assertEqual(bed_count({'beds': 3}), 3)
+
     def test_admin_hidden_room_stays_hidden(self):
         self.apply()
         r = Room.query.filter_by(beds24_room_id=61706).one()

@@ -168,7 +168,7 @@
               <div class="room-name">{{ room.name }}</div>
               <div class="room-meta">
                 <span>👤 {{ room.capacity }} guests</span>
-                <span>🛏️ {{ room.beds }} bed{{ 's' if room.beds > 1 }}</span>
+                {% if room.beds %}<span>🛏️ {{ room.beds }} bed{{ 's' if room.beds > 1 }}</span>{% endif %}
                 {% if room.size_sqm %}<span>📐 {{ room.size_sqm }}m²</span>{% endif %}
               </div>
               <div class="room-amenities">

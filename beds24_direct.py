@@ -261,6 +261,39 @@ def _int(value, default=0):
         return default
 
 
+_NOT_BEDS = {"BEDROOM", "BEDROOMS", "BED_LINEN", "BEDLINEN", "BEDDING", "BED_LINENS"}
+
+
+def _raw_codes(value):
+    """featureCodes as one flat list, keeping repeats (two BED_DOUBLE = two beds)."""
+    out = []
+    for entry in value or []:
+        for c in (entry if isinstance(entry, list) else [entry]):
+            if isinstance(c, str) and c:
+                out.append(c.strip().upper())
+    return out
+
+
+def bed_count(info):
+    """Number of beds Beds24 lists for a room: a numeric field if the API gives
+    one, otherwise the bed-type feature codes (BED_DOUBLE, BED_KING, SOFA_BED,
+    BUNK_BED ...). None when Beds24 has no bed information."""
+    for key in ("beds", "numBeds", "numberOfBeds", "bedCount"):
+        try:
+            n = int(float(info.get(key)))
+            if n > 0:
+                return n
+        except (TypeError, ValueError):
+            pass
+    n = 0
+    for c in _raw_codes(info.get("featureCodes")):
+        if c in _NOT_BEDS or "LINEN" in c or "CRIB" in c or "COT" in c:
+            continue
+        if c.startswith("BED_") or c.endswith("_BED") or c in {"SOFABED", "BUNKBED", "FUTON"}:
+            n += 1
+    return n or None
+
+
 def apply_catalog(props, calendars, start, end, probe_photos=True):
     from app import db, Room, RoomImage, RoomAvailability
 
@@ -271,7 +304,7 @@ def apply_catalog(props, calendars, start, end, probe_photos=True):
     selected = set()
     result = {"properties": len(props), "rooms": 0, "created": 0, "hidden_by_admin": 0,
               "deactivated": 0, "rooms_without_photos": 0, "rooms_without_prices": 0,
-              "not_on_old_site": 0}
+              "not_on_old_site": 0, "beds_from_beds24": 0, "bed_codes_sample": []}
     try:
         for prop in props:
             address = ", ".join(str(prop.get(k)).strip() for k in ("address", "city") if prop.get(k))
@@ -314,6 +347,12 @@ def apply_catalog(props, calendars, start, end, probe_photos=True):
                                            ("maxStay", "max_stay"), ("roomSize", "size_sqm")]:
                         if info.get(source) not in (None, ""):
                             setattr(room, target, _int(info[source]))
+                    beds = bed_count(info)
+                    if beds:
+                        room.beds = beds
+                        result["beds_from_beds24"] += 1
+                    elif len(result["bed_codes_sample"]) < 3 and info.get("featureCodes"):
+                        result["bed_codes_sample"].append({str(rid): _raw_codes(info.get("featureCodes"))[:25]})
                     if not room.max_stay:
                         room.max_stay = 365
                     if not room.min_stay:
