@@ -2329,6 +2329,19 @@ def admin_photo_audit():
                            gas_host=GAS_IMAGE_HOST)
 
 
+@app.route("/admin/photo-audit/import-old-site", methods=["POST"])
+@admin_required
+def admin_import_old_site_photos():
+    """Copy the old site's photos into published apartments that have none."""
+    import old_site
+    res = old_site.import_missing_photos()
+    msg = f"✅ Photos added to {len(res['imported'])} apartment(s)."
+    if res["failed"]:
+        msg += " Not possible for: " + "; ".join(res["failed"][:10])
+    flash(msg, "success" if not res["failed"] else "warning")
+    return redirect(url_for("admin_photo_audit"))
+
+
 @app.route("/admin/photo-audit/clean", methods=["POST"])
 @admin_required
 def admin_photo_audit_clean():

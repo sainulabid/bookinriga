@@ -5,6 +5,15 @@ Used by /admin/photo-audit. Read-only unless clean_to_beds24() is called.
 """
 from urllib.parse import urlparse
 
+
+def is_marketplace_photo(url):
+    from old_site import is_marketplace_photo as f
+    return f(url)
+
+
+def allowed(url):
+    return is_beds24_host(url) or is_marketplace_photo(url)
+
 BEDS24_HOSTS = ("beds24.com", "xmlcal.com")
 
 
@@ -21,6 +30,8 @@ def source_label(url, gas_host):
     host = (urlparse(url).hostname or "").lower()
     if is_beds24_host(url):
         return "Beds24"
+    if is_marketplace_photo(url):
+        return "Beds24 Marketplace (old site)"
     if host == gas_host or "gas.travel" in host:
         return "Old gas.travel site"
     if host.endswith("cloudinary.com"):
@@ -68,9 +79,9 @@ def audit(rooms, gas_host, live):
         b24 = set((live or {}).get(room.beds24_room_id) or [])
         rows = []
         for kind, pid, url in _room_photos(room):
-            ok = url in b24 or is_beds24_host(url)
+            ok = url in b24 or allowed(url)
             rows.append(dict(kind=kind, id=pid, url=url, beds24=ok,
-                             source="Beds24" if ok else source_label(url, gas_host)))
+                             source="Beds24" if url in b24 else source_label(url, gas_host)))
         bad = [r for r in rows if not r["beds24"]]
         shown = {r["url"] for r in rows}
         missing = [u for u in (live or {}).get(room.beds24_room_id, []) if u not in shown] if live else []
@@ -102,7 +113,7 @@ def clean_to_beds24(rooms, live, db, RoomImage):
         if b24:
             keep = b24
         else:
-            keep = [u for u in before if is_beds24_host(u)]
+            keep = [u for u in before if allowed(u)]
         if keep == before:
             continue
         removed += len([u for u in before if u not in keep])

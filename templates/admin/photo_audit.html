@@ -49,6 +49,9 @@ h2.pa-h { font-size:22px; margin:34px 0 14px; }
     {% endif %}
 
     <div class="pa-actions">
+      <form method="post" action="{{ url_for('admin_import_old_site_photos') }}">
+        <button class="btn-secondary" type="submit">Add old-site photos to apartments without photos</button>
+      </form>
       {% if extras %}<a class="btn-secondary" href="{{ url_for('admin_photo_audit', format='csv') }}">⬇ Download non-Beds24 list (CSV)</a>{% endif %}
       {% if live_ok and (extras or totals.beds24_missing) %}
       <form method="post" action="{{ url_for('admin_photo_audit_clean') }}"

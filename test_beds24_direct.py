@@ -89,8 +89,26 @@ class DirectSyncTests(unittest.TestCase):
         self.apply()
         r = db.session.get(Room, old_id)
         self.assertEqual(r.name, 'Studio B')
-        self.assertEqual(r.image, '')  # website shows Beds24 photos only
+        self.assertEqual(r.image, 'https://a0.muscache.com/original/x.jpg')  # Beds24 Marketplace photo kept
         self.assertFalse(db.session.get(Room, gone.id).is_active)
+
+    def test_only_old_site_apartments_are_published(self):
+        import os
+        os.environ['PUBLISHED_BEDS24_ROOM_IDS'] = '149472'
+        try:
+            result = self.apply()
+        finally:
+            os.environ.pop('PUBLISHED_BEDS24_ROOM_IDS')
+        self.assertTrue(Room.query.filter_by(beds24_room_id=149472).one().is_active)
+        self.assertFalse(Room.query.filter_by(beds24_room_id=61706).one().is_active)
+        self.assertEqual(result['not_on_old_site'], 2)
+
+    def test_manual_upload_removed_when_beds24_has_no_photo(self):
+        old = Room(name='Studio B', room_type='Apartment', price=9, beds24_room_id=149473,
+                   image='1782377816_upload.jpg')
+        db.session.add(old); db.session.commit()
+        self.apply()
+        self.assertEqual(db.session.get(Room, old.id).image, '')
 
     def test_admin_hidden_room_stays_hidden(self):
         self.apply()

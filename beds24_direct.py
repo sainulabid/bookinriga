@@ -29,6 +29,11 @@ import requests
 
 from beds24_catalog import RoomText, english_text, feature_codes
 from photo_audit import is_beds24_host
+from old_site import published_room_ids, is_marketplace_photo, import_missing_photos
+
+
+def _allowed_photo(url):
+    return is_beds24_host(url) or is_marketplace_photo(url)
 
 API = "https://beds24.com/api/v2"
 XMLCAL = "https://media.xmlcal.com/pic/p{block:04d}/{rest}/{n}.{ext}"
@@ -259,12 +264,14 @@ def _int(value, default=0):
 def apply_catalog(props, calendars, start, end, probe_photos=True):
     from app import db, Room, RoomImage, RoomAvailability
 
+    published = published_room_ids()
     existing = Room.query.order_by(Room.id).all()
     by_remote = {r.beds24_room_id: r for r in existing if r.beds24_room_id}
     next_order = max([r.reference_order or 0 for r in existing] + [0]) + 1
     selected = set()
     result = {"properties": len(props), "rooms": 0, "created": 0, "hidden_by_admin": 0,
-              "deactivated": 0, "rooms_without_photos": 0, "rooms_without_prices": 0}
+              "deactivated": 0, "rooms_without_photos": 0, "rooms_without_prices": 0,
+              "not_on_old_site": 0}
     try:
         for prop in props:
             address = ", ".join(str(prop.get(k)).strip() for k in ("address", "city") if prop.get(k))
@@ -317,7 +324,7 @@ def apply_catalog(props, calendars, start, end, probe_photos=True):
                     room.amenities = ", ".join(names)[:255]
                     room.features = json.dumps({"amenities": names})
 
-                has_b24_cover = bool(room.image) and is_beds24_host(room.image)
+                has_b24_cover = bool(room.image) and _allowed_photo(room.image)
                 urls = room_pictures(prop, info, raw, probe=probe_photos and not has_b24_cover)
                 if urls:
                     room.image = urls[0]
@@ -325,15 +332,15 @@ def apply_catalog(props, calendars, start, end, probe_photos=True):
                     for url in urls[1:]:
                         db.session.add(RoomImage(room_id=room.id, filename=url))
                 else:
-                    # Website shows Beds24 photos only: drop anything else
-                    # (old gas.travel copies, manual uploads), keep Beds24-hosted ones.
-                    if room.image and not is_beds24_host(room.image):
+                    # Website shows Beds24 photos only: keep Beds24-hosted and
+                    # Beds24 Marketplace photos, drop manual uploads etc.
+                    if room.image and not _allowed_photo(room.image):
                         room.image = ""
                     for p in list(room.photos):
-                        if not is_beds24_host(p.filename):
+                        if not _allowed_photo(p.filename):
                             db.session.delete(p)
                     if not room.image:
-                        nxt = next((p for p in room.photos if is_beds24_host(p.filename)
+                        nxt = next((p for p in room.photos if _allowed_photo(p.filename)
                                     and p not in db.session.deleted), None)
                         if nxt:
                             room.image = nxt.filename
@@ -354,7 +361,10 @@ def apply_catalog(props, calendars, start, end, probe_photos=True):
                     result["rooms_without_prices"] += 1
 
                 hidden = bool(getattr(room, "website_hidden", False))
-                room.is_active = _int(info.get("qty"), 1) > 0 and not hidden
+                listed = rid in published
+                if not listed:
+                    result["not_on_old_site"] += 1
+                room.is_active = _int(info.get("qty"), 1) > 0 and not hidden and listed
                 if hidden:
                     result["hidden_by_admin"] += 1
 
@@ -404,6 +414,12 @@ def main():
                                                               Room.beds24_room_id.isnot(None)).all()}
         LAST_REPORT = property_report(props, before)
         result = apply_catalog(props, calendars, start, end)
+        try:
+            photos = import_missing_photos()
+            if photos["imported"] or photos["failed"]:
+                print(f"[beds24] Old-site photos: imported {len(photos['imported'])}, failed {photos['failed']}")
+        except Exception as e:
+            print(f"[beds24] Old-site photo import skipped: {e}")
     print(f"[beds24] Direct catalog sync: {result}")
     print(f"[beds24] Properties seen: {LAST_REPORT['properties_seen']}, rooms: {LAST_REPORT['rooms_seen']}, "
           f"previously published rooms found: {LAST_REPORT['rooms_from_website_before_found_in_beds24']}"

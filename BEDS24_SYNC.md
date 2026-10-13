@@ -8,13 +8,18 @@ name, description, photos, amenities (feature codes), capacity, stay limits,
 size, address, and 365 days of nightly prices and availability. Whatever you
 change in Beds24 appears on bookinriga.onrender.com at the next sync.
 
-- Publishes every property the token can read. To limit it, set
-  `BEDS24_PROPERTY_IDS=123,456` in Render.
+- Publishes only the 50 apartments that were on the old site
+  (bookinriga.sites.gas.travel), listed by Beds24 room ID in `old_site.py`.
+  Every other Beds24 room (other properties, duplicate listings) stays
+  hidden. To publish a different set, set
+  `PUBLISHED_BEDS24_ROOM_IDS=123712,61706,...` in Render.
 - Rooms are matched by Beds24 room ID, so existing apartments, their
   bookings and homepage order are kept.
 - Photos: room pictures from the API; for single-apartment properties the
   property pictures (Beds24 media.xmlcal.com). If Beds24 returns none, the
-  room keeps its current photos.
+  room keeps its Beds24 / Beds24 Marketplace photos, and apartments with no
+  photo at all get the photos the old site showed for them. Manual uploads
+  are removed. Check with `/admin/photo-audit`.
 - The catalog changes only after every property and calendar validated; any
   API error keeps the previous catalog. Removed rooms are hidden, not deleted.
 - Unknown dates or dates without a price can never be booked.
