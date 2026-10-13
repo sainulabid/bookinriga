@@ -28,6 +28,7 @@ from urllib.parse import urlparse
 import requests
 
 from beds24_catalog import RoomText, english_text, feature_codes
+from photo_audit import is_beds24_host
 
 API = "https://beds24.com/api/v2"
 XMLCAL = "https://media.xmlcal.com/pic/p{block:04d}/{rest}/{n}.{ext}"
@@ -316,14 +317,29 @@ def apply_catalog(props, calendars, start, end, probe_photos=True):
                     room.amenities = ", ".join(names)[:255]
                     room.features = json.dumps({"amenities": names})
 
-                urls = room_pictures(prop, info, raw, probe=probe_photos and not room.image)
+                has_b24_cover = bool(room.image) and is_beds24_host(room.image)
+                urls = room_pictures(prop, info, raw, probe=probe_photos and not has_b24_cover)
                 if urls:
                     room.image = urls[0]
                     RoomImage.query.filter_by(room_id=room.id).delete()
                     for url in urls[1:]:
                         db.session.add(RoomImage(room_id=room.id, filename=url))
-                elif not room.image:
-                    result["rooms_without_photos"] += 1
+                else:
+                    # Website shows Beds24 photos only: drop anything else
+                    # (old gas.travel copies, manual uploads), keep Beds24-hosted ones.
+                    if room.image and not is_beds24_host(room.image):
+                        room.image = ""
+                    for p in list(room.photos):
+                        if not is_beds24_host(p.filename):
+                            db.session.delete(p)
+                    if not room.image:
+                        nxt = next((p for p in room.photos if is_beds24_host(p.filename)
+                                    and p not in db.session.deleted), None)
+                        if nxt:
+                            room.image = nxt.filename
+                            db.session.delete(nxt)
+                    if not room.image:
+                        result["rooms_without_photos"] += 1
 
                 daily = expand_calendar(calendars.get(rid), start, end)
                 RoomAvailability.query.filter_by(room_id=room.id).delete()

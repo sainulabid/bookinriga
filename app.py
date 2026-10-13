@@ -2299,6 +2299,51 @@ def admin_delete_photo(photo_id):
     return redirect(url_for("admin_edit_room", room_id=rid))
 
 
+@app.route("/admin/photo-audit")
+@admin_required
+def admin_photo_audit():
+    """How many apartment photos are on the website, and which of them are
+    not from Beds24. ?format=csv downloads the non-Beds24 list."""
+    import csv
+    import io
+    import photo_audit as pa
+    rooms = Room.query.filter_by(is_active=True).order_by(Room.name).all()
+    live, error = pa.live_beds24_photos()
+    report, extras, totals = pa.audit(rooms, GAS_IMAGE_HOST, live)
+    for e in extras:
+        u = e["url"]
+        e["view"] = cached_url(u) if u.startswith("http") else url_for(
+            "static", filename=("uploads/" + u) if e["kind"] == "cover" else u)
+    if request.args.get("format") == "csv":
+        buf = io.StringIO()
+        w = csv.writer(buf)
+        w.writerow(["Room ID", "Apartment", "Cover/Photo", "Source", "URL"])
+        for e in extras:
+            w.writerow([e["room_id"], e["room_name"], e["kind"], e["source"], e["url"]])
+        resp = make_response(buf.getvalue())
+        resp.headers["Content-Type"] = "text/csv; charset=utf-8"
+        resp.headers["Content-Disposition"] = "attachment; filename=non-beds24-photos.csv"
+        return resp
+    return render_template("admin/photo_audit.html", report=report, extras=extras,
+                           totals=totals, live_ok=live is not None, error=error,
+                           gas_host=GAS_IMAGE_HOST)
+
+
+@app.route("/admin/photo-audit/clean", methods=["POST"])
+@admin_required
+def admin_photo_audit_clean():
+    import photo_audit as pa
+    live, error = pa.live_beds24_photos()
+    if live is None:
+        flash(f"Beds24 could not be reached ({error}). Nothing was changed.", "danger")
+        return redirect(url_for("admin_photo_audit"))
+    rooms = Room.query.filter_by(is_active=True).all()
+    result = pa.clean_to_beds24(rooms, live, db, RoomImage)
+    flash(f"✅ Done: {result['removed']} non-Beds24 photo(s) removed, "
+          f"{result['added']} Beds24 photo(s) added.", "success")
+    return redirect(url_for("admin_photo_audit"))
+
+
 @app.route("/admin/attractions")
 @admin_required
 def admin_attractions():

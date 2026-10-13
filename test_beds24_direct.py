@@ -89,7 +89,7 @@ class DirectSyncTests(unittest.TestCase):
         self.apply()
         r = db.session.get(Room, old_id)
         self.assertEqual(r.name, 'Studio B')
-        self.assertEqual(r.image, 'https://a0.muscache.com/original/x.jpg')  # no Beds24 photo → keep
+        self.assertEqual(r.image, '')  # website shows Beds24 photos only
         self.assertFalse(db.session.get(Room, gone.id).is_active)
 
     def test_admin_hidden_room_stays_hidden(self):

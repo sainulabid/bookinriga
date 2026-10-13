@@ -1,0 +1,100 @@
+{% extends "base.html" %}
+{% block title %}Photo Audit — BookinRiga Admin{% endblock %}
+
+{% block head %}
+<style>
+.pa-stats { display:grid; grid-template-columns:repeat(4,1fr); gap:16px; margin:24px 0; }
+.pa-stat { background:#fff; border:1px solid var(--gray-100); border-radius:var(--radius-lg); padding:20px; box-shadow:var(--shadow-sm); }
+.pa-stat b { display:block; font-size:30px; color:var(--gray-900); }
+.pa-stat span { font-size:13px; color:var(--gray-500); }
+.pa-stat.bad b { color:var(--danger, #d92d20); }
+.pa-stat.good b { color:#0f8a4a; }
+.pa-note { padding:14px 18px; border-radius:12px; margin-bottom:18px; font-size:14px; }
+.pa-note.warn { background:#fff6e5; color:#8a5300; }
+.pa-note.ok { background:#eaf7ef; color:#0f6b3a; }
+.pa-actions { display:flex; gap:12px; flex-wrap:wrap; margin-bottom:28px; }
+.pa-thumb { width:84px; height:58px; object-fit:cover; border-radius:8px; background:var(--gray-100); display:block; }
+.pa-url { font-size:12px; color:var(--gray-500); word-break:break-all; max-width:420px; }
+.pa-pill { display:inline-block; padding:3px 10px; border-radius:20px; font-size:12px; font-weight:600; background:#fdecea; color:#b42318; }
+.pa-pill.ok { background:#eaf7ef; color:#0f6b3a; }
+.admin-table td.num { text-align:center; }
+h2.pa-h { font-size:22px; margin:34px 0 14px; }
+@media (max-width:800px){ .pa-stats{grid-template-columns:1fr 1fr;} .admin-table{display:block;overflow-x:auto;} }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="page page-wrap">
+  <div class="container admin-shell">
+    <h1 style="font-size:32px">Apartment Photo Audit</h1>
+    <p style="color:var(--gray-500)">Website photos of every active apartment, checked against Beds24.</p>
+
+    {% if live_ok %}
+    <div class="pa-note ok">✓ Compared with live Beds24 data.</div>
+    {% else %}
+    <div class="pa-note warn">⚠ Beds24 could not be reached ({{ error }}). Photos are judged by where they are hosted only, and the clean-up button is disabled.</div>
+    {% endif %}
+
+    <div class="pa-stats">
+      <div class="pa-stat"><b>{{ totals.rooms }}</b><span>Active apartments</span></div>
+      <div class="pa-stat"><b>{{ totals.photos }}</b><span>Photos on website</span></div>
+      <div class="pa-stat good"><b>{{ totals.beds24 }}</b><span>From Beds24</span></div>
+      <div class="pa-stat bad"><b>{{ totals.not_beds24 }}</b><span>Not from Beds24 ({{ totals.rooms_with_extras }} apartments)</span></div>
+    </div>
+    {% if totals.rooms_not_linked or totals.beds24_missing %}
+    <div class="pa-note warn">
+      {% if totals.rooms_not_linked %}{{ totals.rooms_not_linked }} active apartment(s) are not linked to a Beds24 room. {% endif %}
+      {% if totals.beds24_missing %}{{ totals.beds24_missing }} Beds24 photo(s) are not on the website yet.{% endif %}
+    </div>
+    {% endif %}
+
+    <div class="pa-actions">
+      {% if extras %}<a class="btn-secondary" href="{{ url_for('admin_photo_audit', format='csv') }}">⬇ Download non-Beds24 list (CSV)</a>{% endif %}
+      {% if live_ok and (extras or totals.beds24_missing) %}
+      <form method="post" action="{{ url_for('admin_photo_audit_clean') }}"
+            onsubmit="return confirm('Replace every apartment\'s photos with exactly its Beds24 photos? Non-Beds24 photos will be removed from the website.');">
+        <button class="btn-primary" type="submit">Show only Beds24 photos</button>
+      </form>
+      {% endif %}
+    </div>
+
+    <h2 class="pa-h">Per apartment</h2>
+    <table class="admin-table">
+      <thead><tr><th>Apartment</th><th>Beds24 room</th><th class="num">On website</th><th class="num">From Beds24</th><th class="num">Not Beds24</th><th class="num">In Beds24</th></tr></thead>
+      <tbody>
+        {% for r in report %}
+        <tr>
+          <td style="font-weight:600"><a href="{{ url_for('admin_edit_room', room_id=r.room.id) }}">{{ r.room.name }}</a></td>
+          <td>{% if r.linked %}{{ r.room.beds24_room_id }}{% else %}<span class="pa-pill">not linked</span>{% endif %}</td>
+          <td class="num">{{ r.total }}</td>
+          <td class="num">{{ r.beds24 }}</td>
+          <td class="num">{% if r.not_beds24 %}<span class="pa-pill">{{ r.not_beds24 }}</span>{% else %}<span class="pa-pill ok">0</span>{% endif %}</td>
+          <td class="num">{% if r.beds24_available is none %}—{% else %}{{ r.beds24_available }}{% if r.missing %} <small style="color:#8a5300">({{ r.missing }} missing)</small>{% endif %}{% endif %}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+
+    <h2 class="pa-h">Photos not from Beds24 ({{ extras|length }})</h2>
+    {% if extras %}
+    <table class="admin-table">
+      <thead><tr><th>#</th><th>Photo</th><th>Apartment</th><th>Type</th><th>Source</th><th>URL</th></tr></thead>
+      <tbody>
+        {% for e in extras %}
+        <tr>
+          <td>{{ loop.index }}</td>
+          <td><a href="{{ e.view }}" target="_blank" rel="noopener"><img class="pa-thumb" src="{{ e.view }}" alt="" loading="lazy"></a></td>
+          <td>{{ e.room_name }}</td>
+          <td>{{ e.kind }}</td>
+          <td>{{ e.source }}</td>
+          <td class="pa-url">{{ e.url }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    {% else %}
+    <div class="pa-note ok">All website photos come from Beds24.</div>
+    {% endif %}
+  </div>
+</div>
+{% endblock %}
