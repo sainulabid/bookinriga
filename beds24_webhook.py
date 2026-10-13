@@ -2,7 +2,7 @@
 
 Beds24 setup (Settings > Properties > Access > Booking Webhook, or the
 account-level webhook), for every published property:
-    URL: https://bookinriga.onrender.com/webhook/beds24-booking?key=<BEDS24_WEBHOOK_SECRET>
+    URL: https://bookinriga.onrender.com/webhook/beds24-booking  (Webhook Version 2)
 
 Whenever a booking is created, modified or cancelled in Beds24 — including
 bookings from Airbnb, Booking.com etc. — Beds24 calls this URL. The body is
@@ -11,8 +11,9 @@ min stay) from the Beds24 API and replace the website's rows for it, using
 exactly the same rules as the 30-minute full sync (beds24_direct.py), so a
 booked date is closed on the website within seconds.
 
-BEDS24_WEBHOOK_SECRET (Render env) is required; requests without the
-matching ?key= (or X-Webhook-Secret header) are rejected.
+BEDS24_WEBHOOK_SECRET (Render env) is optional: when set, calls must carry it
+as ?key= or an X-Webhook-Secret header. Unknown rooms are ignored and
+refreshes are rate-limited, so the URL alone cannot be abused.
 """
 import hmac
 import os
@@ -25,6 +26,8 @@ from flask import jsonify, request
 _recent = {}
 _lock = threading.Lock()
 DEBOUNCE_SECONDS = 15
+MAX_PER_5_MIN = 60        # Beds24 API calls budget for webhook refreshes
+_window = []
 LAST_EVENTS = []          # small in-memory log shown on the admin status page
 
 
@@ -113,17 +116,29 @@ def _update(room_ids):
 
 def handle_webhook():
     secret = os.environ.get("BEDS24_WEBHOOK_SECRET", "")
-    # Accept the key in the URL (?key=) or in the X-Webhook-Secret header.
-    given = [request.args.get("key", ""), request.headers.get("X-Webhook-Secret", "")]
-    if not secret or not any(g and hmac.compare_digest(g, secret) for g in given):
-        return jsonify({"ok": False, "error": "unauthorized"}), 401
+    # Optional key (?key= or X-Webhook-Secret header). Without one the call is
+    # still safe: its body is only a trigger, every value is re-read from the
+    # Beds24 API, and refreshes are rate-limited below.
+    if secret:
+        given = [request.args.get("key", ""), request.headers.get("X-Webhook-Secret", "")]
+        if not any(g and hmac.compare_digest(g, secret) for g in given):
+            return jsonify({"ok": False, "error": "unauthorized"}), 401
     if request.method == "GET":
         return jsonify({"ok": True, "note": "webhook is reachable"}), 200
 
     room_ids = extract_room_ids(request.get_json(force=True, silent=True) or {})
+    try:
+        from old_site import published_room_ids
+        room_ids &= published_room_ids()      # only apartments shown on the website
+    except Exception:
+        pass
     now = time.monotonic()
     with _lock:
+        while _window and now - _window[0] > 300:
+            _window.pop(0)
         due = {r for r in room_ids if now - _recent.get(r, 0) > DEBOUNCE_SECONDS}
+        due = set(sorted(due)[:max(0, MAX_PER_5_MIN - len(_window))])
+        _window.extend([now] * len(due))
         for r in due:
             _recent[r] = now
     if due:
