@@ -1787,6 +1787,14 @@ def admin_run_beds24_sync():
     }
 
 
+@app.route("/webhook/beds24-booking", methods=["GET", "POST"])
+def beds24_booking_webhook():
+    """Beds24 calls this on every new/changed/cancelled booking; the room's
+    availability is refreshed within seconds. See beds24_webhook.py."""
+    from beds24_webhook import handle_webhook
+    return handle_webhook()
+
+
 @app.route("/admin/beds24-sync-status")
 @admin_required
 def admin_beds24_sync_status():
@@ -1803,6 +1811,14 @@ def admin_beds24_sync_status():
     state["safe_to_remove_gas_travel_site"] = state["rooms_from_beds24"] > 0 and gas_left == 0 \
         and state.get("status") == "success" and state["catalog_source"] == "beds24"
     state["selected_property_ids"] = os.environ.get("BEDS24_PROPERTY_IDS", "") or "all properties the token can read"
+    try:
+        import beds24_webhook
+        state["booking_webhook"] = {
+            "secret_set": bool(os.environ.get("BEDS24_WEBHOOK_SECRET")),
+            "recent_events": beds24_webhook.LAST_EVENTS[-10:],
+        }
+    except Exception:
+        pass
     try:
         import beds24_direct
         state["beds24_properties"] = beds24_direct.LAST_REPORT or "run /admin/run-beds24-sync first"
